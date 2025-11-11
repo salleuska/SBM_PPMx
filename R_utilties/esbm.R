@@ -34,15 +34,43 @@ urn_GN <- function(v_minus,gamma_GN){
 # if prior=="PY", alpha_PY and sigma_PY must be set
 # if prior=="DM", beta_DM and H_DM must be set
 # if prior=="GN", gamma_GN must be set
-# x = V-vector of categorical covariates
-# if x is specified, also alpha_xi (a C-vector of parameters for a Dirichlet distribution) must be set
+
+## SP 
+# x = V-vector of covariates (note - it will beed to be a matrix as some point)
+# similarity_fun = an R function that computed the similiary function for the covariate
+# assume the user passes a well-formed x (vector, matrix, or factor) and the function knows how to handle it.
+# sim_args = list of arguments for the similiarity function. Note that the similarity_fun needs to handle checks    # V x C
+
+
+similarity_dirichlet <- function(Z_minus_v, cluster_sizes, v_index, H, 
+                                x, args) {
+  # x: factor with C categories
+  stopifnot(is.factor(x))
+  
+  params <- as.numeric(args$params)
+  if (length(params) != nlevels(x))
+    stop("args$params must have length equal to nlevels(x).")
+  params_sum <- sum(params)
+
+  # One-hot representation computed on the fly (fast for one covariate)
+  X <- stats::model.matrix(~ x - 1)               # V x C
+  Vx <- crossprod(Z_minus_v, X[-v_index, , drop = FALSE])  # H x C
+  cat_idx <- as.integer(x[v_index])               # 1..C
+
+  add_old <- (Vx[, cat_idx] + params[cat_idx]) / (cluster_sizes + params_sum)
+  add_new <-  params[cat_idx] / params_sum
+
+  log(c(add_old, add_new))                        # numeric length H+1, log-scale
+}
+
 
 # Output:
 # Posterior samples of the community labels for each node v=1,...,V
 
 esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
                  alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
-                 x=NULL, alpha_xi=NULL){
+                 x=NULL,
+                 similarity_fun = NULL, sim_args = list()){
   
   # ----------------------------------------------
   # Selection of the prior distribution to be used
@@ -61,18 +89,10 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
   }
   
   # ----------------------------------------------
-  # Pre-processing of the node attributes
-  # ----------------------------------------------
-  
+  # SP: check if covariates have been provided
+  # ----------------------------------------------  
   if (!is.null(x)){
-    print("Covariates have been provided")
-    x <- as.numeric(as.factor(x))
-    X <- vec2mat(x)
-    if (!is.null(alpha_xi)){
-      alpha0 <- sum(alpha_xi)
-    } else {
-      stop("If covariates x are given, then alpha_xi must be set as well")
-    }
+    print("Note : covariates have been provided")
   }
   
   # ----------------------------------------------
@@ -151,17 +171,28 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
       # ----------------------------------------------
       # SP - Covariates part
       # ----------------------------------------------
-      # initialize log contribution of the similarity funciton g()
-      log_similarity_g    <- 0
-      
-      if(!is.null(x)){
-        Vx                <- crossprod(Z_v, X[-v,])
-        addit_old         <- (Vx[,x[v]] + alpha_xi[x[v]]) / (v_minus+alpha0)
-        addit_new         <- alpha_xi[x[v]] / alpha0
-        log_similarity_g  <- log(c(addit_old, addit_new))
+      # ---- Similarity g(): log-weights for H existing + 1 new cluster
+      if (is.null(similarity_fun)) {
+        log_similarity_g <- rep(0, H + 1)   # default: no similarity
+      } else {
+        log_similarity_g <- similarity_fun(
+          Z_minus_v     = Z_v,             # (V-1) x H membership without v
+          cluster_sizes = v_minus,         # length H
+          v_index       = v,               # focal node
+          H             = H,               # number of active clusters
+          x             = x,               # passed through untouched
+          args          = sim_args         # user hyperparameters
+        )
+        if (!is.numeric(log_similarity_g) || length(log_similarity_g) != (H + 1) ||
+            any(!is.finite(log_similarity_g))) {
+          stop("similarity_fun must return a finite numeric vector of length H+1 (log-scale).")
+        }
       }
       
-      # Probabilities
+      # ----------------------------------------------
+      # SP: clustering probabilities
+      # ----------------------------------------------
+      # # Probabilities
       log_p <- log_similarity_g + log(urn(v_minus)) + c(log_lhds_old, log_lhd_new)
       p     <- exp(log_p - max(log_p)); #p <- p / sum(p)
       
@@ -284,26 +315,31 @@ return(edge_matr)
 log_pY_z <- function(Y,z,a,b){
 # in: Adjacency matrix Y, one vector of node labels z, hyperparameters (a,b) of Beta priors for block probabilities
 # out: logarithm of the marginal likelihood in eq. [1] evaluated at z.
+  
+  # SP - check for reshape dependency
+  if (!requireNamespace("reshape2", quietly = TRUE)) {
+    stop("Package 'reshape2' is required for this function. Please install it with install.packages('reshape2').")
+  }
 
-H <- length(unique(z))
-colnames(Y) <- rownames(Y) <- z
+  H <- length(unique(z))
+  colnames(Y) <- rownames(Y) <- z
 
-edge_counts <- melt(Y)
+  edge_counts <- reshape2::melt(Y)
 
-Y_c <- 1 - Y
-diag(Y_c) <- 0
-non_edge_counts <- melt(Y_c)
-	
-Edge <- matrix(aggregate(edge_counts[,3],by=list(edge_counts[,1],edge_counts[,2]),sum,na.rm=TRUE)[,3],H,H)
-diag(Edge) <- diag(Edge)/2
+  Y_c <- 1 - Y
+  diag(Y_c) <- 0
+  non_edge_counts <- reshape2::melt(Y_c)
+  	
+  Edge <- matrix(aggregate(edge_counts[,3],by=list(edge_counts[,1],edge_counts[,2]),sum,na.rm=TRUE)[,3],H,H)
+  diag(Edge) <- diag(Edge)/2
 
-No_Edge <- matrix(aggregate(non_edge_counts[,3],by=list(non_edge_counts[,1],non_edge_counts[,2]),sum,na.rm=TRUE)[,3],H,H)
-diag(No_Edge) <- diag(No_Edge)/2
+  No_Edge <- matrix(aggregate(non_edge_counts[,3],by=list(non_edge_counts[,1],non_edge_counts[,2]),sum,na.rm=TRUE)[,3],H,H)
+  diag(No_Edge) <- diag(No_Edge)/2
 
-a_n <- lowerTriangle(Edge,diag=TRUE)+a
-b_bar_n <- lowerTriangle(No_Edge,diag=TRUE)+b
+  a_n <- lowerTriangle(Edge,diag=TRUE)+a
+  b_bar_n <- lowerTriangle(No_Edge,diag=TRUE)+b
 
-return(sum(lbeta(a_n,b_bar_n))-(H*(H+1)/2)*lbeta(a,b))
+  return(sum(lbeta(a_n,b_bar_n))-(H*(H+1)/2)*lbeta(a,b))
 }
 
 ####################################################################################
@@ -343,6 +379,8 @@ sampleLL <- function(memb,Y,a,b){
 ####################################################################################
 
 pred_esbm <- function(Y, prior, z_hat, a=1, b=1,alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA){
+
+#### SP: may need to check this ######
 
 # in: Adjacency matrix Y whose last row and column contain the observed edges for the new node to be classified, one vector of node labels z_hat for the already observed nodes, hyperparameters (a,b) of Beta priors for block probabilities, and prior for the partition process
 # out: full conditional probabilities for the memebership of the new node to the different clusters.

@@ -22,12 +22,10 @@ suppressPackageStartupMessages({
   library(LaplacesDemon)
 })
 
-source(here("R_utilties", "esbm.R"))
-Rcpp::sourceCpp(here("R_utilties", "stirling.cpp"))
 
-## ---- Data ----
+## ---- Source ----
 source(here("R_utilties", "esbm.R"))
-Rcpp::sourceCpp(here("R_utilties", "stirling.cpp"))
+Rcpp::sourceCpsp(here("R_utilties", "stirling.cpp"))
 
 ## ---- Data ----
 load(here("test_sim_ESBM", "network_1.RData"))  # expects: Y, z_0 (true labels)
@@ -50,7 +48,7 @@ invisible(expected_cl_py(V, sigma = sigma_py, theta = alpha_py, H = Inf))
 invisible(sum(1:V * HGnedin(V, 1:V, gamma = gamma_gn)))
 
 ## ---- Collapsed Gibbs sampler (unsupervised) ----
-N_iter <- 10000
+N_iter <- 2000
 my_seed <- 1
 my_z <- seq_len(V)
 
