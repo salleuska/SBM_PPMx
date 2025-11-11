@@ -145,21 +145,24 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
       
       log_lhds_old <- rowSums(lbeta(m + R + a, m_bar + V_minus - R + b) - lbeta(m + a, m_bar + b)) # vector of length H
       log_lhd_new  <- sum(lbeta(r_v + a, v_minus - r_v + b) - lbeta(a, b)) # scalar
-      log_addit    <- 0
+      
+
       
       # ----------------------------------------------
       # SP - Covariates part
       # ----------------------------------------------
+      # initialize log contribution of the similarity funciton g()
+      log_similarity_g    <- 0
       
       if(!is.null(x)){
-        Vx        <- crossprod(Z_v, X[-v,])
-        addit_old <- (Vx[,x[v]] + alpha_xi[x[v]]) / (v_minus+alpha0)
-        addit_new <- alpha_xi[x[v]] / alpha0
-        log_addit <- log(c(addit_old, addit_new))
+        Vx                <- crossprod(Z_v, X[-v,])
+        addit_old         <- (Vx[,x[v]] + alpha_xi[x[v]]) / (v_minus+alpha0)
+        addit_new         <- alpha_xi[x[v]] / alpha0
+        log_similarity_g  <- log(c(addit_old, addit_new))
       }
       
       # Probabilities
-      log_p <- log_addit + log(urn(v_minus)) + c(log_lhds_old, log_lhd_new)
+      log_p <- log_similarity_g + log(urn(v_minus)) + c(log_lhds_old, log_lhd_new)
       p     <- exp(log_p - max(log_p)); #p <- p / sum(p)
       
       # ----------------------------------------------
@@ -422,9 +425,9 @@ pred_esbm <- function(Y, prior, z_hat, a=1, b=1,alpha_PY=NA, sigma_PY=NA, beta_D
       
       log_lhds_old <- rowSums(lbeta(m + R + a, m_bar + V_minus - R + b) - lbeta(m + a, m_bar + b)) # vector of length H
       log_lhd_new  <- sum(lbeta(r_v + a, v_minus - r_v + b) - lbeta(a, b)) # scalar
-      log_addit    <- 0  
+      log_similarity_g    <- 0  
   
-      log_p <- log_addit + log(urn(v_minus)) + c(log_lhds_old, log_lhd_new)
+      log_p <- log_similarity_g + log(urn(v_minus)) + c(log_lhds_old, log_lhd_new)
       p     <- exp(log_p - max(log_p)); 
             
       return(p)
