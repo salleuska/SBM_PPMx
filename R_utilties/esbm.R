@@ -41,7 +41,8 @@ urn_GN <- function(v_minus,gamma_GN){
 # Posterior samples of the community labels for each node v=1,...,V
 
 esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
-                 alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, x=NULL, alpha_xi=NULL){
+                 alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
+                 x=NULL, alpha_xi=NULL){
   
   # ----------------------------------------------
   # Selection of the prior distribution to be used
@@ -145,6 +146,10 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
       log_lhds_old <- rowSums(lbeta(m + R + a, m_bar + V_minus - R + b) - lbeta(m + a, m_bar + b)) # vector of length H
       log_lhd_new  <- sum(lbeta(r_v + a, v_minus - r_v + b) - lbeta(a, b)) # scalar
       log_addit    <- 0
+      
+      # ----------------------------------------------
+      # SP - Covariates part
+      # ----------------------------------------------
       
       if(!is.null(x)){
         Vx        <- crossprod(Z_v, X[-v,])

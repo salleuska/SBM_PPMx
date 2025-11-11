@@ -14,3 +14,7 @@ which include functions for the posterior sampling of stochastic block model for
 - cohesion function for continuous covariate (derived from normal distribution)
 - cohesion function for covariates defined on a circle 
 - weighted cohesion function
+
+## Notes on simulation ideas
+
+We would like to modify 
