@@ -9,7 +9,7 @@ The directory `R_utilities` contains the file `esbm_original.R` and `stirling.cp
 [https://github.com/danieledurante/ESBM](https://github.com/danieledurante/ESBM)
 which include functions for the posterior sampling of stochastic block model for binary data with a categorical covariate
 
-The file `esbm.R` modifies the original gibbs function to allow passing as an argument a general similarity function and eventual parameters of the similarity funciton. See `R_utilities/similiary_funcitons.R` for details on the format and implemented functions. 
+The file `esbm.R` modifies the original gibbs function to allow passing as an argument a general similarity function and eventual parameters of the similarity funciton. See `R_utilities/similiary_functions.R` for details on the format and implemented functions. 
 
 20251112 - implemented a similarity based on a normal auxiliary model with variance fixed to 1 with normal prior on the mean only. 
 
