@@ -40,7 +40,7 @@ urn_GN <- function(v_minus,gamma_GN){
 # Output:
 # Posterior samples of the community labels for each node v=1,...,V
 
-esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
+esbm_original <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
                  alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
                  x=NULL, alpha_xi=NULL){
   

@@ -49,20 +49,30 @@ similarity_dirichlet <- function(Z_minus_v, cluster_sizes, v_index, H,
   
   params <- as.numeric(args$params)
   if (length(params) != nlevels(x))
-    stop("args$params must have length equal to nlevels(x).")
+    stop(args$params, "must have length equal to", nlevels(x))
   params_sum <- sum(params)
 
-  # One-hot representation computed on the fly (fast for one covariate)
+  # compute factor representation
   X <- stats::model.matrix(~ x - 1)               # V x C
   Vx <- crossprod(Z_minus_v, X[-v_index, , drop = FALSE])  # H x C
   cat_idx <- as.integer(x[v_index])               # 1..C
 
+  ## similarity weight when adding node v to a current cluster
   add_old <- (Vx[, cat_idx] + params[cat_idx]) / (cluster_sizes + params_sum)
+  ## similarity weight when adding node v to a new cluster
   add_new <-  params[cat_idx] / params_sum
 
   log(c(add_old, add_new))                        # numeric length H+1, log-scale
 }
 
+
+# PPMx similarity: Remark 1 (product of N(0,1))
+# x: numeric vector; we only use x[v_index]
+similarity_ppmx_gaussian_product <- function(Z_minus_v, cluster_sizes, v_index, H, x, args) {
+  stopifnot(is.numeric(x), length(v_index) == 1L)
+  logphi <- dnorm(x[v_index], mean = 0, sd = 1, log = TRUE)
+  rep(logphi, H + 1L)  # identical for each existing cluster and the "new" one
+}
 
 # Output:
 # Posterior samples of the community labels for each node v=1,...,V
