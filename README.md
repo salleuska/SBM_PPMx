@@ -5,7 +5,7 @@ Install packages in the `install.R` script. This repo uses the R library `here` 
 
 ## Description
 
-The directory `source` contains the file `esbm.R` and `stirling.cppp` from 
+The directory `source` contains the file `esbm_original.R` and `stirling.cppp` from 
 [https://github.com/danieledurante/ESBM](https://github.com/danieledurante/ESBM)
 which include functions for the posterior sampling of stochastic block model for binary data with a categorical covariate
 
