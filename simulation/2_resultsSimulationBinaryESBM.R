@@ -22,7 +22,7 @@ suppressPackageStartupMessages({
 
 results_dir <- here("simulation", "results")
 
-burn_frac <- 0.5   # drop first 50% iterations
+burn_frac <- 0.1  # drop first 50% iterations
 thin_step <- 1     # keep every 
 
 ## ---------------------------
@@ -46,6 +46,7 @@ cat("Found", length(files_res), "result files.\n")
 ## ---------------------------
 
 summ_list <- vector("list", length(files_res))
+psm_list  <- vector("list", length(files_res))  # store PSMs here
 
 for (i in seq_along(files_res)) {
   f_res <- files_res[i]
@@ -54,11 +55,11 @@ for (i in seq_along(files_res)) {
   res <- readRDS(f_res)
 
   # Extract posterior samples and metadata
-  Z_post   <- res$Z_DM      # V x N_iter
+  Z_post   <- res$Z_post      # V x N_iter
   alpha    <- res$alpha
   seed     <- res$seed
   scen_res <- res$scenario
-  sim_path <- res$file      # path to original simulation .rds
+  sim_path <- res$file        # path to original simulation .rds
 
   sim_obj <- readRDS(here(sim_path))
   z_true  <- sim_obj$partition
@@ -74,13 +75,12 @@ for (i in seq_along(files_res)) {
 
   Z_keep <- Z_post[, keep_i, drop = FALSE]   # V x T_keep
 
-  if (ncol(Z_keep) < 2L) {
-    stop("Too few post-burn-in samples after thinning in ", f_res)
-  }
+  # Posterior similarity matrix (PSM)
+  coClust_prob <- psm(t(Z_keep))    # iterations x items → transpose
 
-  coClust_prob <- psm(t(Z_keep))
-  ## use variation of information to estimate clustering
-  z_hat <- salso(t(Z_keep), loss=VI())
+  # VI representative clustering
+  z_hat <- salso(t(Z_keep), loss = VI())
+
   ## ---------------------------
   ## ARI vs true clustering
   ## ---------------------------
@@ -93,6 +93,7 @@ for (i in seq_along(files_res)) {
   # Extract alpha tag & base name from filename (optional)
   base_name <- file_path_sans_ext(basename(f_res))
 
+  # store summary row
   summ_list[[i]] <- data.frame(
     file_res   = basename(f_res),
     sim_file   = sim_path,
@@ -100,26 +101,32 @@ for (i in seq_along(files_res)) {
     scenario   = scen_res,
     alpha      = alpha,
     seed       = seed,
-    coClust_prob = coClust_prob,
     K_hat      = K_hat,
     ARI        = ari,
     stringsAsFactors = FALSE
   )
+
+  # store PSM in list
+  psm_list[[i]] <- coClust_prob
 }
 
 summary_df <- do.call(rbind, summ_list)
+names(psm_list) <- basename(files_res)
 
 ## ---------------------------
-## Save summary
+## Save summary and PSMs
 ## ---------------------------
 
 out_csv <- file.path(results_dir, "summary_binaryESBM.csv")
 write.csv(summary_df, out_csv, row.names = FALSE)
-
 cat("Saved summary to:\n  ", out_csv, "\n")
 
+psm_out <- file.path(results_dir, "psm_binaryESBM.rds")
+saveRDS(psm_list, psm_out)
+cat("Saved PSM list to:\n  ", psm_out, "\n")
+
 ## ---------------------------
-## Optional: quick ARI vs alpha plot
+## ARI vs alpha plot
 ## ---------------------------
 
 p <- ggplot(summary_df,
@@ -135,3 +142,8 @@ p <- ggplot(summary_df,
 
 print(p)
 
+psm_list <- readRDS(here("simulation", "results", "psm_binaryESBM.rds"))
+names(psm_list)
+# pick one:
+psm_both_a1  <- psm_list[["post_binarySBM_both_alpha-1p00_seed-1.rds"]]
+image(psm_both_a1)  # or use your own heatmap code

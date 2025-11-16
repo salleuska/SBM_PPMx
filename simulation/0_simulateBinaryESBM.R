@@ -28,8 +28,8 @@ library(here)
 ## simulate a binary network from the SBM
 simBinarySBM <- function(
   clust_sizes = c(50, 40, 30, 30),   # cluster sizes
-  p_within    = 0.8,                 # within-cluster edge prob
-  p_between   = 0.1                  # between-cluster edge prob
+  p_within    = 0.6,                 # within-cluster edge prob
+  p_between   = 0.3                  # between-cluster edge prob
 ) {
 
   n <- sum(clust_sizes)                 # sample size
