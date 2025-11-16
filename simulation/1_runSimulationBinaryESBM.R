@@ -13,11 +13,11 @@ suppressPackageStartupMessages({
 ## -------------------------------
 args <- R.utils::commandArgs(asValue = TRUE)
 
-# file path (REQUIRED)
-if (is.null(args$file)) {
+# data_path  (REQUIRED)
+if (is.null(args$data_path)) {
   stop("Please provide file=path/to/simulated.rds")
 } else {
-  file_path <- args$file
+  data_path <- args$data_path
 }
 
 # alpha (default 1)
@@ -42,7 +42,7 @@ if (is.null(args$N_iter)) {
 }
 
 cat("Running ESBM with:\n")
-cat("  file     =", file_path, "\n")
+cat("  file     =", data_path, "\n")
 cat("  alpha    =", alpha_in, "\n")
 cat("  seed     =", seed, "\n")
 cat("  N_iter   =", N_iter, "\n\n")
@@ -67,7 +67,7 @@ set.seed(seed)
 ## -------------------------------
 ## Load the simulated object
 ## -------------------------------
-sim_obj <- readRDS(file_path)
+sim_obj <- readRDS(data_path)
 
 Y  <- sim_obj$Y
 x  <- sim_obj$x
@@ -76,7 +76,7 @@ z0 <- sim_obj$partition
 ## -------------------------------
 ## Infer scenario from file name
 ## -------------------------------
-fname <- basename(file_path)
+fname <- basename(data_path)
 
 if (grepl("none", fname, ignore.case = TRUE)) {
   scenario <- "none"
@@ -106,7 +106,7 @@ if (scenario == "none") {
   x_df <- data.frame(x1 = x[, 1])
 
   similarity_fun <- similarity_ppmx_gaussian_mean
-  sim_args       <- list(list(m0 = 0, s0 = sqrt(2)))
+  sim_args       <- list(list(m0 = 0, s0 = sqrt(1)))
   alpha_g_vec    <- alpha_in
 
 } else if (scenario == "both") {
@@ -155,11 +155,11 @@ cat("Sampler finished.\n\n")
 ## -------------------------------
 ## Save results
 ## -------------------------------
-out_dir <- here("simulated", "results")
+out_dir <- here("simulation", "results")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 alpha_tag <- gsub("\\.", "p", sprintf("%.3f", alpha_in))
-base_name <- file_path_sans_ext(basename(file_path))
+base_name <- basename(data_path)
 
 out_file <- file.path(
   out_dir,
@@ -170,11 +170,12 @@ out_file <- file.path(
 saveRDS(
   list(
     Z_DM    = Z_DM,
-    file    = file_path,
+    file    = data_path,
     alpha   = alpha_in,
     seed    = seed,
     N_iter  = N_iter,
-    scenario= scenario
+    scenario= scenario,
+    seed = seed
   ),
   file = out_file
 )
