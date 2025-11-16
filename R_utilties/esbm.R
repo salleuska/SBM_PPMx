@@ -36,8 +36,8 @@ urn_GN <- function(v_minus,gamma_GN){
 # if prior=="GN", gamma_GN must be set
 
 ## SP 
-# x = V-vector of covariates (note - it will beed to be a matrix as some point)
-# similarity_fun = an R function that computed the similiary function for the covariate
+# x  is a data.frame 
+# similarity_fun - either one R function or a list of R functions 
 # assume the user passes a well-formed x (vector, matrix, or factor) and the function knows how to handle it.
 # sim_args = list of arguments for the similiarity function. Note that the similarity_fun needs to handle checks    # V x C
 
@@ -45,11 +45,7 @@ urn_GN <- function(v_minus,gamma_GN){
 # Output:
 # Posterior samples of the community labels for each node v=1,...,V
 
-esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
-                 alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
-                 x=NULL,
-                 similarity_fun = NULL, sim_args = list()){
-  
+ 
   ## possibile controllo
   ## if x is a dataframe
   ## ncol(Y) = nrow(Y) = nrow(x)
@@ -57,6 +53,13 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
   ## similarity_fun is list 
   ## da aggiungere ora un vettore alpha - length(alpha) = length(similarity_fun)
 
+
+esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
+                 alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
+                 x=NULL,
+                 similarity_fun = NULL, sim_args = list(), 
+                 alpha_g = 1){
+ 
   # ----------------------------------------------
   # Selection of the prior distribution to be used
   # ----------------------------------------------
@@ -74,12 +77,39 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
   }
   
   # ----------------------------------------------
-  # SP: check if covariates have been provided
+  # SP: checks if covariates have been provided
   # ----------------------------------------------  
   if (!is.null(x)){
     print("Note : covariates have been provided")
+    # x must be a data.frame
+    if (!is.data.frame(x)) {
+      stop("When similarity_fun is used, x must be a data.frame.")
+    }
+
+    # coerce similarity_fun to list so Gibbs loop is unified
+    if (is.function(similarity_fun)) {
+      similarity_fun <- list(similarity_fun)
+    } else if (!is.list(similarity_fun)) {
+      stop("similarity_fun must be either a function or a list of functions.")
+    }
+
+    J <- length(similarity_fun)
+
+    # x must have exactly one column per similarity function
+    if (ncol(x) != J) {
+      stop("ncol(x) must equal length(similarity_fun).")
+    }
+
+    # alpha_g must be scalar or length J
+    if (length(alpha_g) == 1L) {
+      alpha_g <- rep(alpha_g, J)
+    } else if (length(alpha_g) != J) {
+      stop("alpha_g must be scalar or a vector of length equal to similarity_fun.")
+    }
   }
   
+    
+
   # ----------------------------------------------
   # Initialization
   # ----------------------------------------------
@@ -90,7 +120,9 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
   
   # cluster assignments are encoded in two equivalent ways:
   # [i] a VxH matrix Z, s.t. Z[v,h]=1{node v in cluster h}, faster to use within each iteration
-  Z <- vec2mat(z_init)
+  Z <- diag(max(z_init))[z_init, , drop = FALSE]
+  # Z <- vec2mat() - remove unnecessary functions
+  
   
   # [ii] a vector of length V containing the cluster label for each node, more compact to store;
   # such vectors for all iterations are packed in a VxN_iter matrix z_post, 
@@ -152,77 +184,35 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
       log_lhd_new  <- sum(lbeta(r_v + a, v_minus - r_v + b) - lbeta(a, b)) # scalar
       
 
-      
+          
       # ----------------------------------------------
-      # SP - Covariates part
+      # SP - Covariates part: Similarity g()
+      # log-weights for H existing + 1 new cluster
       # ----------------------------------------------
-      # ---- Similarity g(): log-weights for H existing + 1 new cluster
       if (is.null(similarity_fun)) {
-        log_similarity_g <- rep(0, H + 1)   # default: no similarity
+
+        log_similarity_g <- rep(0, H + 1)
+
       } else {
-        log_similarity_g <- similarity_fun(
-          Z_minus_v     = Z_v,             # (V-1) x H membership without v
-          cluster_sizes = v_minus,         # length H
-          v_index       = v,               # focal node
-          H             = H,               # number of active clusters
-          x             = x,               # passed through untouched
-          args          = sim_args         # user hyperparameters
-        )
-        if (!is.numeric(log_similarity_g) || length(log_similarity_g) != (H + 1) ||
-            any(!is.finite(log_similarity_g))) {
-          stop("similarity_fun must return a finite numeric vector of length H+1 (log-scale).")
+        # initialize combined log g
+        log_similarity_g <- rep(0, H + 1)
+
+        # loop over similarities
+        for (j in seq_len(J)) {
+
+          log_g_j <- similarity_fun[[j]](
+            Z_minus_v     = Z_v,
+            cluster_sizes = v_minus,
+            v_index       = v,
+            H             = H,
+            x             = x[, j],        # one column per similarity
+            args          = sim_args[[j]]
+          )
+          # apply alpha exponent: log(g^alpha) = alpha * log(g)
+          log_similarity_g <- log_similarity_g + alpha_g[j] * log_g_j
         }
       }
-      
-      ## TO CHECK -- allow a list?
-      ## ---- Similarity g(): log-weights for H existing + 1 new cluster
-      # if (is.null(similarity_fun)) {
-      #   # default: no similarity
-      #   log_similarity_g <- rep(0, H + 1)
-
-      # } else if (is.list(similarity_fun)) {
-      #   # multiple similarity functions (e.g. multiple covariates)
-      #   if (!is.list(x))
-      #     stop("When similarity_fun is a list, x must be a list of covariates.")
-      #   if (!is.list(sim_args))
-      #     stop("When similarity_fun is a list, sim_args must be a list (same length).")
-      #   if (length(similarity_fun) != length(x) ||
-      #       length(similarity_fun) != length(sim_args))
-      #     stop("Lengths of similarity_fun, x, and sim_args must match.")
-
-      #   log_similarity_g <- rep(0, H + 1)
-      #   for (j in seq_along(similarity_fun)) {
-      #     log_g_j <- similarity_fun[[j]](
-      #       Z_minus_v     = Z_v,
-      #       cluster_sizes = v_minus,
-      #       v_index       = v,
-      #       H             = H,
-      #       x             = x[[j]],
-      #       args          = sim_args[[j]]
-      #     )
-      #     if (!is.numeric(log_g_j) || length(log_g_j) != (H + 1) ||
-      #         any(!is.finite(log_g_j))) {
-      #       stop("Each similarity_fun[[j]] must return a finite numeric vector of length H+1.")
-      #     }
-      #     # Add log–similarities from each covariate
-      #     log_similarity_g <- log_similarity_g + log_g_j
-      #   }
-
-      # } else {
-      #   # single similarity function (backward compatible)
-      #   log_similarity_g <- similarity_fun(
-      #     Z_minus_v     = Z_v,             # (V-1) x H membership without v
-      #     cluster_sizes = v_minus,         # length H
-      #     v_index       = v,               # focal node
-      #     H             = H,               # number of active clusters
-      #     x             = x,               # user-provided covariate object
-      #     args          = sim_args         # user hyperparameters
-      #   )
-      #   if (!is.numeric(log_similarity_g) || length(log_similarity_g) != (H + 1) ||
-      #       any(!is.finite(log_similarity_g))) {
-      #     stop("similarity_fun must return a finite numeric vector of length H+1 (log-scale).")
-      #   }
-      # }
+     
       # ----------------------------------------------
       # SP: clustering probabilities
       # ----------------------------------------------
@@ -284,10 +274,16 @@ vec2mat <- function(clust_lab){
   return(M)
 }
 
+clust_lab <- sample(1:5, 10, replace = TRUE)
+test <- vec2mat(clust_lab)
+test
+M
 
 ####################################################################################
 # COMPUTE POSTERIOR CO-CLUSTERING MATRIX  ##########################################
 ####################################################################################
+
+
 
 pr_cc <- function(z_post){
   # in: posterior sample of assignments (VxN_iter matrix)
