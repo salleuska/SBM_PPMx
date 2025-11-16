@@ -3,6 +3,7 @@ suppressPackageStartupMessages({
   library(Rcpp)
   library(here)
   library(igraph)
+  library(tools)
 })
 ## -------------------------------
 ## Parse command-line args
@@ -15,7 +16,7 @@ args <- R.utils::commandArgs(asValue = TRUE)
 
 # data_path  (REQUIRED)
 if (is.null(args$data_path)) {
-  stop("Please provide file=path/to/simulated.rds")
+  stop("Please provide data_path=path/to/simulated.rds")
 } else {
   data_path <- args$data_path
 }
@@ -134,12 +135,12 @@ if (scenario == "none") {
 ## -------------------------------
 cat("Starting ESBM sampler...\n")
 
-Z_DM <- esbm(
+Z_post <- esbm(
   Y         = Y,
   seed      = seed,
   N_iter    = N_iter,
   prior     = "DM",
-  z_init    = z0,
+  z_init    = sample(1:4, nrow(Y), replace = TRUE),
   a         = a,
   b         = b,
   beta_DM   = beta_dm,
@@ -158,8 +159,9 @@ cat("Sampler finished.\n\n")
 out_dir <- here("simulation", "results")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
-alpha_tag <- gsub("\\.", "p", sprintf("%.3f", alpha_in))
-base_name <- basename(data_path)
+alpha_tag <- gsub("\\.", "p", sprintf("%.2f", alpha_in))
+
+base_name <- file_path_sans_ext(basename(data_path))
 
 out_file <- file.path(
   out_dir,
@@ -169,10 +171,9 @@ out_file <- file.path(
 
 saveRDS(
   list(
-    Z_DM    = Z_DM,
+    Z_post    = Z_post,
     file    = data_path,
     alpha   = alpha_in,
-    seed    = seed,
     N_iter  = N_iter,
     scenario= scenario,
     seed = seed
