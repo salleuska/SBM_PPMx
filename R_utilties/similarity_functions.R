@@ -36,14 +36,14 @@
 ################################################################################
 similarity_ppmx_gaussian_mean <- function(Z_minus_v, cluster_sizes, v_index, H, x, args) {
   
-#   browser()
   # --- hyperparameters
-  m0   <- args$m0
-  var0 <- args$s0^2          # prior variance
-  if (!is.numeric(m0) || !is.numeric(var0) || var0 <= 0)
+  if (!is.numeric(args$m0) || !is.numeric(args$s0) || args$s0 <= 0)
     stop("args must contain m0 (numeric) and s0 > 0.")
   if (!is.numeric(x))
     stop("x must be a numeric vector.")
+
+  m0   <- args$m0
+  var0 <- (args$s0^2)         # prior variance
 
   # --- cluster sufficient statistics (excluding v)
   x_minus <- x[-v_index]

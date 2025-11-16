@@ -57,7 +57,8 @@ urn_GN <- function(v_minus,gamma_GN){
 esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
                  alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
                  x=NULL,
-                 similarity_fun = NULL, sim_args = list(), 
+                 similarity_fun = NULL, 
+                 sim_args = list(), 
                  alpha_g = 1){
  
   # ----------------------------------------------
@@ -100,12 +101,24 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
       stop("ncol(x) must equal length(similarity_fun).")
     }
 
+    ## sim_args must also be a list of length J
+    if (!is.list(sim_args)) {
+      stop("sim_args must be a list when similarity_fun is provided.")
+    }
+    if (length(sim_args) == 1L && J > 1L) {
+      sim_args <- replicate(J, sim_args, simplify = FALSE)
+    }
+    if (length(sim_args) != J) {
+      stop("sim_args must have length equal to length(similarity_fun).")
+    }
+
     # alpha_g must be scalar or length J
     if (length(alpha_g) == 1L) {
       alpha_g <- rep(alpha_g, J)
     } else if (length(alpha_g) != J) {
       stop("alpha_g must be scalar or a vector of length equal to similarity_fun.")
     }
+ 
   }
   
     
@@ -259,6 +272,11 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
 
 
 ####################################################################################
+## SP : this funcitons have not been checked
+## some uses packages and it is not clear which ones
+####################################################################################
+
+####################################################################################
 # PUT CLUSTER LABELS IN BINARY MATRIX FORM  ########################################
 ####################################################################################
 
@@ -274,10 +292,7 @@ vec2mat <- function(clust_lab){
   return(M)
 }
 
-clust_lab <- sample(1:5, 10, replace = TRUE)
-test <- vec2mat(clust_lab)
-test
-M
+
 
 ####################################################################################
 # COMPUTE POSTERIOR CO-CLUSTERING MATRIX  ##########################################
