@@ -77,9 +77,11 @@ params <- rep(1, length(unique(my_x)))
 
 Z_DM_x <- esbm(Y, my_seed, N_iter, "DM", my_z, a = a, b = b,
                beta_DM = beta_dm, H_DM = H_dm, 
-               x = as.factor(my_x), similarity_fun = similarity_dirichlet, 
-               sim_args = list(params = params)
+               x = data.frame(test = as.factor(my_x)), 
+               similarity_fun = similarity_dirichlet, 
+               sim_args = list(list(params = params))
               )
+
 
 # DP + x
 my_alpha_xi <- rep(1, length(unique(my_x)))
@@ -93,7 +95,7 @@ tail(Z_DM_x) == tail(Z_DP_2)
 
 #################################################
 ## ---- Collapsed Gibbs sampler with continuous covariates  ----
-## This is new! no check, just to see if thins are running 
+## This is new! no check, just to see if things are running 
 
 
 N_iter <- 2000
@@ -104,7 +106,10 @@ my_x <- rnorm(seq_len(V))
 
 Z_DM_x <- esbm(Y, my_seed, N_iter, "DM", my_z, a = a, b = b,
                beta_DM = beta_dm, H_DM = H_dm, 
-               x = my_x, 
+               x = data.frame(test = my_x), 
                similarity_fun = similarity_ppmx_gaussian_mean, 
-               sim_args = list(m0 = 0, s0 = sqrt(2))
+               sim_args = list(list(m0 = 0, s0 = sqrt(2)))
               )
+
+sim_args = list(m0 = 0, s0 = sqrt(2))
+

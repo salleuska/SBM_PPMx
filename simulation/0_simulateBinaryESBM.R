@@ -172,7 +172,7 @@ add_covariates_SBMsim <- function(base_obj,
 
 set.seed(1116)
 
-# Generate ONE network
+# Generate one network
 base <- simBinarySBM()
 
 # Generate three covariate scenarios using same Y and same z
@@ -180,9 +180,13 @@ sim_none  <- add_covariates_SBMsim(base, "none")
 sim_one   <- add_covariates_SBMsim(base, "one")
 sim_both  <- add_covariates_SBMsim(base, "both")
 
-saveRDS(sim_none, here("simulation/binarySBM_none.rds"))
-saveRDS(sim_one, here("simulation/binarySBM_one.rds"))
-saveRDS(sim_both, here("simulation/binarySBM_both.rds"))
+## create directory if it does not exists
+dir.create(here("simulation/data"), 
+  recursive = TRUE, showWarnings = FALSE)
+
+saveRDS(sim_none, here("simulation/data/binarySBM_none.rds"))
+saveRDS(sim_one, here("simulation/data/binarySBM_one.rds"))
+saveRDS(sim_both, here("simulation/data/binarySBM_both.rds"))
 #######################
 ## Plotting
 #######################
