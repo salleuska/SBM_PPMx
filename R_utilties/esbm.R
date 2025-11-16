@@ -50,6 +50,13 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
                  x=NULL,
                  similarity_fun = NULL, sim_args = list()){
   
+  ## possibile controllo
+  ## if x is a dataframe
+  ## ncol(Y) = nrow(Y) = nrow(x)
+  ## ncol(x) = length(similarity_fun)
+  ## similarity_fun is list 
+  ## da aggiungere ora un vettore alpha - length(alpha) = length(similarity_fun)
+
   # ----------------------------------------------
   # Selection of the prior distribution to be used
   # ----------------------------------------------
@@ -167,6 +174,55 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
         }
       }
       
+      ## TO CHECK -- allow a list?
+      ## ---- Similarity g(): log-weights for H existing + 1 new cluster
+      # if (is.null(similarity_fun)) {
+      #   # default: no similarity
+      #   log_similarity_g <- rep(0, H + 1)
+
+      # } else if (is.list(similarity_fun)) {
+      #   # multiple similarity functions (e.g. multiple covariates)
+      #   if (!is.list(x))
+      #     stop("When similarity_fun is a list, x must be a list of covariates.")
+      #   if (!is.list(sim_args))
+      #     stop("When similarity_fun is a list, sim_args must be a list (same length).")
+      #   if (length(similarity_fun) != length(x) ||
+      #       length(similarity_fun) != length(sim_args))
+      #     stop("Lengths of similarity_fun, x, and sim_args must match.")
+
+      #   log_similarity_g <- rep(0, H + 1)
+      #   for (j in seq_along(similarity_fun)) {
+      #     log_g_j <- similarity_fun[[j]](
+      #       Z_minus_v     = Z_v,
+      #       cluster_sizes = v_minus,
+      #       v_index       = v,
+      #       H             = H,
+      #       x             = x[[j]],
+      #       args          = sim_args[[j]]
+      #     )
+      #     if (!is.numeric(log_g_j) || length(log_g_j) != (H + 1) ||
+      #         any(!is.finite(log_g_j))) {
+      #       stop("Each similarity_fun[[j]] must return a finite numeric vector of length H+1.")
+      #     }
+      #     # Add log–similarities from each covariate
+      #     log_similarity_g <- log_similarity_g + log_g_j
+      #   }
+
+      # } else {
+      #   # single similarity function (backward compatible)
+      #   log_similarity_g <- similarity_fun(
+      #     Z_minus_v     = Z_v,             # (V-1) x H membership without v
+      #     cluster_sizes = v_minus,         # length H
+      #     v_index       = v,               # focal node
+      #     H             = H,               # number of active clusters
+      #     x             = x,               # user-provided covariate object
+      #     args          = sim_args         # user hyperparameters
+      #   )
+      #   if (!is.numeric(log_similarity_g) || length(log_similarity_g) != (H + 1) ||
+      #       any(!is.finite(log_similarity_g))) {
+      #     stop("similarity_fun must return a finite numeric vector of length H+1 (log-scale).")
+      #   }
+      # }
       # ----------------------------------------------
       # SP: clustering probabilities
       # ----------------------------------------------
