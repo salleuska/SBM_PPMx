@@ -1,4 +1,4 @@
-uppressPackageStartupMessages({
+SuppressPackageStartupMessages({
   library(Rcpp)
   library(here)
   library(igraph)

@@ -18,7 +18,7 @@ library(salso)      # point estimate for the clustering
 ## Settings
 ##---------------------------##
 
-results_dir <- here("simulation", "results")
+results_dir <- here("simulation", "results", "oneCov")
 
 burn_frac <- 0.1  # drop first 50% iterations
 thin_step <- 1     # keep every 
