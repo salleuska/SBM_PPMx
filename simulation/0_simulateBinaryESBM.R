@@ -246,6 +246,7 @@ plot_adj_matrix_gg(sim_none)
 plot_network_geo(sim_none)
 plot_network_geo(sim_one)
 plot_network_geo(sim_both)
+
 #######################################################
 #######################################################
 #### BACKUP: one function
