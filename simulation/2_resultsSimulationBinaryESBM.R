@@ -20,8 +20,11 @@ library(salso)      # point estimate for the clustering
 
 results_dir <- here("simulation", "results", "oneCov")
 
-burn_frac <- 0.1  # drop first 50% iterations
-thin_step <- 1     # keep every 
+## if two covariates
+#results_dir <- here("simulation", "results", "twoCov")
+
+burn_frac <- 0.2 # brunin
+thin_step <- 1   # eventual thinning
 
 ##---------------------------##
 ## List result files
@@ -29,7 +32,7 @@ thin_step <- 1     # keep every
 
 files_res <- list.files(
   results_dir,
-  pattern = "^post_.*\\.rds$",
+  pattern = "^post.*\\.rds$",
   full.names = TRUE
 )
 
@@ -140,8 +143,8 @@ p <- ggplot(summary_df,
 
 print(p)
 
-psm_list <- readRDS(here("simulation", "results", "psm_binaryESBM.rds"))
+psm_list <- readRDS(here(results_dir, "psm_binaryESBM.rds"))
 names(psm_list)
 # pick one:
-psm_both_a1  <- psm_list[["post_binarySBM_both_alpha-1p00_seed-1.rds"]]
+psm_both_a1  <- psm_list[[5]]
 image(psm_both_a1)  # or use your own heatmap code

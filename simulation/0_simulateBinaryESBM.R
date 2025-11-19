@@ -226,7 +226,7 @@ plot_adj_matrix_gg <- function(sim_obj) {
 set.seed(1116)
 
 # Generate one network - sparse
-base <- simBinarySBM(p_within = 0.3, p_between = 0.2)
+base <- simBinarySBM(p_within = 0.4, p_between = 0.2)
 
 # Generate three covariate scenarios using same Y and same z
 sim_none  <- add_covariates_SBMsim(base, "none")
@@ -241,8 +241,8 @@ saveRDS(sim_none, here("simulation/data/binarySBM_none.rds"))
 saveRDS(sim_one, here("simulation/data/binarySBM_one.rds"))
 saveRDS(sim_both, here("simulation/data/binarySBM_both.rds"))
 
-plot_adj_matrix_gg(sim_none)
 
+plot_adj_matrix_gg(sim_none)
 plot_network_geo(sim_none)
 plot_network_geo(sim_one)
 plot_network_geo(sim_both)

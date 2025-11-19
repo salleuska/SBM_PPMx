@@ -1,9 +1,7 @@
-SuppressPackageStartupMessages({
-  library(Rcpp)
-  library(here)
-  library(igraph)
-  library(tools)
-})
+library(Rcpp)
+library(here)
+library(igraph)
+library(tools)
 
 args <- R.utils::commandArgs(asValue = TRUE)
 
