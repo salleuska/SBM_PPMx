@@ -201,6 +201,7 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
       # ----------------------------------------------
       # SP - Covariates part: Similarity g()
       # log-weights for H existing + 1 new cluster
+      # covariates weighted with alpha
       # ----------------------------------------------
       if (is.null(similarity_fun)) {
 
@@ -221,8 +222,12 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
             x             = x[, j],        # one column per similarity
             args          = sim_args[[j]]
           )
-          # apply alpha exponent: log(g^alpha) = alpha * log(g)
-          log_similarity_g <- log_similarity_g + alpha_g[j] * log_g_j
+          # --- normalize g_j across clusters ---
+          lse_j     <- log(sum(exp(log_g_j)))          # log(sum exp(log g_j))
+          log_g_j_n <- log_g_j - lse_j                 # log normalized g_j
+
+          # add covariate similarity, weighted by alpha_g[j]
+          log_similarity_g <- log_similarity_g + alpha_g[j] * log_g_j_n
         }
       }
      
