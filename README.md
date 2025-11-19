@@ -84,35 +84,20 @@ Two scripts run the ESBM under different settings:
 - **`1_runSimulationBinaryESBM.R`**  
    Version with both covariantes
 
-hese scripts:
+These scripts:
+
 1. Parse input arguments (`data_path`, `alpha`, `seed`).  
 2. Load the dataset and the sampler.  
 3. Run ESBM with the chosen similarity and \( \alpha \).  
-4. Save results in `simulation/results/`.
+4. Save results in `simulation/results/[oneCov/twoCov]`.
 
-#### Example: run directly from R
+Note: I run the scripts from bash in parallel via `runSimOneCov.sh` 
 
-```r
-## run from the project root
-args <- list(
-  data_path = "simulation/data/binarySBM_one.rds",
-  alpha     = 1,
-  seed      = 123
-)
 
-## emulate command-line arguments
-commandArgs <- function(...) c(
-  paste0("data_path=", args$data_path),
-  paste0("alpha=", args$alpha),
-  paste0("seed=", args$seed)
-)
-
-source("simulation/1_runSimulationBinaryESBM.R")
-```
 
 - **`2_resultsSimulationBinaryESBM.R`**
 Collects all outputs and computes:
-	•	ARI vs true labels,
-	•	effect of the similarity parameter ( \alpha ) by scenario.
+	ARI vs true labels,
+	effect of the similarity parameter ( \alpha ) by scenario.
 
 

@@ -137,14 +137,16 @@ p <- ggplot(summary_df,
   geom_point() +
   geom_line() +
   theme_minimal() +
+  ylim(c(0,1)) + 
   labs(title = "ARI vs alpha",
        x = expression(alpha),
        y = "Adjusted Rand Index")
+
 
 print(p)
 
 psm_list <- readRDS(here(results_dir, "psm_binaryESBM.rds"))
 names(psm_list)
 # pick one:
-psm_both_a1  <- psm_list[[5]]
+psm_both_a1  <- psm_list[[9]]
 image(psm_both_a1)  # or use your own heatmap code
