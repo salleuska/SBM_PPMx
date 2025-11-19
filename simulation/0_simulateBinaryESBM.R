@@ -226,7 +226,7 @@ plot_adj_matrix_gg <- function(sim_obj) {
 set.seed(1116)
 
 # Generate one network - sparse
-base <- simBinarySBM(p_within = 0.5, p_between = 0.2)
+base <- simBinarySBM(p_within = 0.3, p_between = 0.2)
 
 # Generate three covariate scenarios using same Y and same z
 sim_none  <- add_covariates_SBMsim(base, "none")

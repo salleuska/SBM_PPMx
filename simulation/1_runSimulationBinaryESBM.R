@@ -156,7 +156,7 @@ cat("Sampler finished.\n\n")
 ## -------------------------------
 ## Save results
 ## -------------------------------
-out_dir <- here("simulation", "results")
+out_dir <- here("simulation", "results", "twoCov")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 alpha_tag <- gsub("\\.", "p", sprintf("%.2f", alpha_in))

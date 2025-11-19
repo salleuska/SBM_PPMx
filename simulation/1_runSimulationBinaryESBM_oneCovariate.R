@@ -97,7 +97,7 @@ Z_post <- esbm(
   seed      = seed,
   N_iter    = N_iter,
   prior     = "DM",
-  z_init    = sample(1:10, nrow(Y), replace = TRUE),
+  z_init    = sample(1:4, nrow(Y), replace = TRUE),
   a         = a,
   b         = b,
   beta_DM   = beta_dm,
@@ -113,7 +113,7 @@ cat("Done.\n\n")
 ## -------------------------------
 ## Save output
 ## -------------------------------
-out_dir <- here("simulation", "results")
+out_dir <- here("simulation", "results", "oneCov")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 alpha_tag  <- gsub("\\.", "p", sprintf("%.2f", alpha_in))

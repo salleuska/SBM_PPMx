@@ -19,4 +19,6 @@ The file `esbm.R` modifies the original gibbs function to allow passing as an ar
 - cohesion function for covariates defined on a circle 
 - weighted cohesion function
 
-## Notes on simulation ideas
+## Notes on simulations
+
+The folder `simulation` contains an initial 
