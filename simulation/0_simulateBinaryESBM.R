@@ -1,6 +1,14 @@
-# ------------------------------------------------------------------#
+#------------------------------------------------------------------#
 # This script generate synthetic data from a binary SBM 
-#
+#------------------------------------------------------------------#
+
+library(MASS)
+library(here)
+library(igraph)
+library(ggplot2)
+library(RColorBrewer)
+
+#------------------------------------------------------------------#
 # Part 1: simBinarySBM simulates a network Y of size n x n from 
 # stochastic block model with 4 clusters
 #         - Clusters have sizes ns = (n1, n2, n3, n4).
@@ -21,11 +29,8 @@
 #       block_probs     block-probability matrix
 #       clust_sizes     cluster sizes
 #
-# ------------------------------------------------------------------ #
-library(MASS)
-library(here)
-
-## simulate a binary network from the SBM
+#------------------------------------------------------------------#
+# simulate a binary network from the SBM
 simBinarySBM <- function(
   clust_sizes = c(50, 40, 30, 30),   # cluster sizes
   p_within    = 0.6,                 # within-cluster edge prob
@@ -40,7 +45,7 @@ simBinarySBM <- function(
   Theta <- matrix(p_between, K, K)
   diag(Theta) <- p_within
 
-  # --- SAMPLE ADJACENCY MATRIX Y ---
+  #--- SAMPLE ADJACENCY MATRIX Y ---
   # (this step does NOT vary with cov_dep)
   # NOTE: you can even use the same Y for all the 3 scenarios
   Y <- matrix(0L, n, n)
@@ -60,58 +65,6 @@ simBinarySBM <- function(
   )
 }
 
-
-add_covariates_SBMsim <- function(base_obj, cov_dep = c("none", "one", "both")) {
-  cov_dep <- match.arg(cov_dep)
-
-  Y <- base_obj$Y
-  z <- base_obj$partition
-
-  n <- length(z)
-  K <- length(unique(z))
-  if (K != 4L) stop("Current covariate design assumes exactly 4 clusters.")
-
-  x <- matrix(NA_real_, n, 2)
-
-  if (cov_dep == "both") {
-
-    mx <- matrix(c( 1,  1,
-                    1, -1,
-                   -1,  1,
-                   -1, -1),
-                 K, 2, byrow = TRUE)
-
-    s  <- 0.5
-    Sx <- s * diag(2)
-
-    for (i in 1:n) {
-      x[i, ] <- MASS::mvrnorm(1, mx[z[i], ], Sx)
-    }
-
-  } else if (cov_dep == "one") {
-
-    mx1 <- c(-1.5, -0.5, +0.5, +1.5)
-    sx1 <- 0.5
-
-    mx2 <- 0
-    sx2 <- 1
-
-    for (i in 1:n) {
-      x[i, ] <- c(
-        rnorm(1, mx1[z[i]], sx1),
-        rnorm(1, mx2, sx2)
-      )
-    }
-
-  } else { # none
-
-    x <- MASS::mvrnorm(n, mu = c(0,0), Sigma = diag(2))
-  }
-
-  base_obj$x       <- x
-  base_obj$cov_dep <- cov_dep
-  base_obj
-}
 
 add_covariates_SBMsim <- function(base_obj, 
   cov_dep = c("none", "one", "both")) {
@@ -166,30 +119,9 @@ add_covariates_SBMsim <- function(base_obj,
   base_obj
 }
 
-#######################
-## simulations
-#######################
-
-set.seed(1116)
-
-# Generate one network
-base <- simBinarySBM()
-
-# Generate three covariate scenarios using same Y and same z
-sim_none  <- add_covariates_SBMsim(base, "none")
-sim_one   <- add_covariates_SBMsim(base, "one")
-sim_both  <- add_covariates_SBMsim(base, "both")
-
-## create directory if it does not exists
-dir.create(here("simulation/data"), 
-  recursive = TRUE, showWarnings = FALSE)
-
-saveRDS(sim_none, here("simulation/data/binarySBM_none.rds"))
-saveRDS(sim_one, here("simulation/data/binarySBM_one.rds"))
-saveRDS(sim_both, here("simulation/data/binarySBM_both.rds"))
-#######################
-## Plotting
-#######################
+#------------------------------------------------------------------#
+# Plotting functions
+#------------------------------------------------------------------#
 plot_network_geo <- function(sim_obj, main = NULL) {
   Y <- sim_obj$Y
   x <- sim_obj$x
@@ -204,7 +136,7 @@ plot_network_geo <- function(sim_obj, main = NULL) {
   layout_xy <- as.matrix(x)   # use (x1, x2) as coordinates
 
   K    <- length(unique(z))
-  pal  <- grDevices::rainbow(K)
+  pal  <- c(1, 2, 3,4)
   vcol <- pal[z]
 
   if (is.null(main)) {
@@ -223,7 +155,98 @@ plot_network_geo <- function(sim_obj, main = NULL) {
   )
 }
 
-## plot_network_geo(sim_none)
+
+plot_adj_matrix_gg <- function(sim_obj) {
+  Y  <- sim_obj$Y
+  z0 <- sim_obj$partition
+  V  <- length(z0)
+  
+  # remove self-loops
+  diag(Y) <- 0
+  
+  #------------------------------------------#
+  # Order nodes by true cluster to show blocks
+  #------------------------------------------#
+  ord   <- order(z0)
+  Y_ord <- Y[ord, ord]
+  z_ord <- z0[ord]
+  
+  #------------------------------------------#
+  # Build long data.frame in base R
+  #------------------------------------------#
+  # indices
+  grid_idx <- expand.grid(
+    row = seq_len(V),
+    col = seq_len(V)
+  )
+  
+  # adjacency values (row-major)
+  grid_idx$value <- as.vector(Y_ord)
+  
+  # factors for plotting:
+  # flip row so cluster 1 is at bottom (heatmap style)
+  grid_idx$row_f <- factor(grid_idx$row,
+                           levels = rev(seq_len(V)))
+  grid_idx$col_f <- factor(grid_idx$col,
+                           levels = seq_len(V))
+  
+  # cluster label per row (after ordering)
+  grid_idx$cluster <- factor(z_ord[grid_idx$row])
+  
+  #------------------------------------------#
+  # Colors
+  #------------------------------------------#
+  adj_pal <- colorRampPalette(
+    brewer.pal(9, "Greys")[c(1, 9)]
+  )(50)
+  
+  #------------------------------------------#
+  # Plot
+  #------------------------------------------#
+  ggplot(grid_idx, aes(x = col_f, y = row_f, fill = value)) +
+    geom_tile() +
+    scale_fill_gradientn(colors = adj_pal, guide = "none") +
+    coord_fixed() +
+    theme_minimal(base_size = 12) +
+    theme(
+      axis.text.x  = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.title   = element_blank(),
+      panel.grid   = element_blank()
+    ) +
+    ggtitle("Adjacency matrix")
+}
+
+
+
+#------------------------------------------------------------------#
+# Simulations
+#------------------------------------------------------------------#
+
+set.seed(1116)
+
+# Generate one network - sparse
+base <- simBinarySBM(p_within = 0.5, p_between = 0.2)
+
+# Generate three covariate scenarios using same Y and same z
+sim_none  <- add_covariates_SBMsim(base, "none")
+sim_one   <- add_covariates_SBMsim(base, "one")
+sim_both  <- add_covariates_SBMsim(base, "both")
+
+## create directory if it does not exists
+dir.create(here("simulation/data"), 
+  recursive = TRUE, showWarnings = FALSE)
+
+saveRDS(sim_none, here("simulation/data/binarySBM_none.rds"))
+saveRDS(sim_one, here("simulation/data/binarySBM_one.rds"))
+saveRDS(sim_both, here("simulation/data/binarySBM_both.rds"))
+
+plot_adj_matrix_gg(sim_none)
+
+plot_network_geo(sim_none)
+plot_network_geo(sim_one)
+plot_network_geo(sim_both)
+#######################################################
 #######################################################
 #### BACKUP: one function
 # simBinarySBMx <- function(
@@ -244,7 +267,7 @@ plot_network_geo <- function(sim_obj, main = NULL) {
 #   Theta <- matrix(p_between, K, K)
 #   diag(Theta) <- p_within
 
-#   # --- SAMPLE ADJACENCY MATRIX Y ---
+#   #--- SAMPLE ADJACENCY MATRIX Y ---
 #   Y <- matrix(0L, n, n)
 
 #   for (i in 1:(n - 1)) {
@@ -256,7 +279,7 @@ plot_network_geo <- function(sim_obj, main = NULL) {
 #     }
 #   }
 
-#   # --- SAMPLE COVARIATES x (depends on cov_dep) ---
+#   #--- SAMPLE COVARIATES x (depends on cov_dep) ---
 #   x <- matrix(NA_real_, n, 2)
 
 #   if (cov_dep == "both") {
