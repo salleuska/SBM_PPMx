@@ -114,6 +114,36 @@ plot_adj_matrix_gg <- function(sim_obj) {
 }
 
 
+plot_psm_gg <- function(psm, title = "") {
+  V <- nrow(psm)
+  
+  # long data.frame in base R
+  grid_idx <- expand.grid(
+    row = seq_len(V),
+    col = seq_len(V)
+  )
+  grid_idx$value <- as.vector(psm)
+  
+  # flip rows so origin is bottom-left like a matrix
+  grid_idx$row_f <- factor(grid_idx$row, levels = rev(seq_len(V)))
+  grid_idx$col_f <- factor(grid_idx$col, levels = seq_len(V))
+  
+  pal <- colorRampPalette(brewer.pal(9, "Blues"))(50)
+  
+  ggplot(grid_idx, aes(x = col_f, y = row_f, fill = value)) +
+    geom_tile() +
+    scale_fill_gradientn(colors = pal, limits = c(0, 1)) +
+    coord_fixed() +
+    theme_minimal(base_size = 11) +
+    theme(
+      axis.text.x  = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.title   = element_blank(),
+      panel.grid   = element_blank(),
+      plot.title   = element_text(hjust = 0.5)
+    ) +
+    ggtitle(title)
+}
 ```
 
 
@@ -135,6 +165,7 @@ plot_network_geo(sim_one)
 plot_network_geo(sim_both)
 ```
 
+**Note**: for this first simualtion I used just scenario none and one and included only one covariate in the model
 
 For the simulation study we run the ESBM gibbs with the following settings 
 
@@ -156,5 +187,99 @@ with $(m_0, s_0^2) = (0, 1)$,
 
 We run the MCMC for 10000 iterations
 
-### Results
+### Results - one covariate
 
+
+```{r}
+#| label: load-one-cov
+#| echo: false
+#| message: false
+#| warning: false
+library(here)
+library(ggplot2)
+
+results_dir <- here("simulation", "results","oneCov")
+
+## load summary and PSM list
+summary_df <- read.csv(file.path(results_dir, "summary_binaryESBM.csv"))
+psm_list   <- readRDS(file.path(results_dir, "psm_binaryESBM.rds"))
+
+## group by scenario
+one_df  <- subset(summary_df, scenario == "one")
+none_df <- subset(summary_df, scenario == "none")
+
+
+```
+
+
+```{r}
+#| label: plot-one-ari
+#| fig-width: 5
+#| fig-height: 3.5
+
+ggplot(summary_df,
+            aes(x = alpha, y = ARI,
+                color = scenario,
+                group = interaction(scenario, seed))) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  ylim(c(0,1)) + 
+  labs(title = "ARI vs alpha",
+       x = expression(alpha),
+       y = "Adjusted Rand Index")
+
+```
+
+
+**Note** : note sure why $\alpha = 0.5$ improves on the ARI.
+
+### Scenario :none 
+
+Estimate of the posterior probabilities of co-clustering -- here they look all the same for different alphas. 
+
+
+```{r}
+#| label: psm-one-none
+#| layout-ncol: 2
+#| fig-width: 4
+#| fig-height: 4
+
+for (i in seq_len(nrow(none_df))) {
+  
+  row_i         <- none_df[i, ]
+  file_res_i    <- row_i$file_res
+  psm_i         <- psm_list[[file_res_i]]
+  
+  title_i <- sprintf("no covariate effect\nalpha = %.2f", 
+                     row_i$alpha, row_i$seed)
+  
+  print(plot_psm_gg(psm_i, title_i))
+}
+
+```
+
+### Scenario: one 
+Estimate of the posterior probabilities of co-clustering for different values of $\alpha$ 
+
+
+```{r}
+#| label: psm-all-one
+#| layout-ncol: 2
+#| fig-width: 4
+#| fig-height: 4
+
+for (i in seq_len(nrow(one_df))) {
+  
+  row_i         <- one_df[i, ]
+  file_res_i    <- row_i$file_res
+  psm_i         <- psm_list[[file_res_i]]
+  
+  title_i <- sprintf("One covariate\nalpha = %.2f", 
+                     row_i$alpha, row_i$seed)
+  
+  print(plot_psm_gg(psm_i, title_i))
+}
+
+
+```
