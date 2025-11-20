@@ -252,7 +252,7 @@ for (i in seq_len(nrow(none_df))) {
   psm_i         <- psm_list[[file_res_i]]
   
   title_i <- sprintf("no covariate effect\nalpha = %.2f", 
-                     row_i$alpha, row_i$seed)
+                     row_i$alpha)
   
   print(plot_psm_gg(psm_i, title_i))
 }
@@ -276,7 +276,7 @@ for (i in seq_len(nrow(one_df))) {
   psm_i         <- psm_list[[file_res_i]]
   
   title_i <- sprintf("One covariate\nalpha = %.2f", 
-                     row_i$alpha, row_i$seed)
+                     row_i$alpha)
   
   print(plot_psm_gg(psm_i, title_i))
 }
