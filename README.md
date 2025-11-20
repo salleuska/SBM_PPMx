@@ -22,8 +22,7 @@ which include functions for the posterior sampling of stochastic block model for
   **2025-11-12 update:**  
   Implemented a similarity based on a **normal auxiliary model**:  
   - observation model: \( x_i \mid \mu_h \sim N(\mu_h, 1) \)  
-  - prior on cluster mean: \( \mu_h \sim N(m_0, s_0^2) \)  
-  This provides a continuous-covariate cohesion that can be raised to a power parameter \( \alpha \) for calibration.
+  - prior on cluster mean: \( \mu_h \sim N(m_0, s_0^2) \) 
 
 ### Planned extensions
 
