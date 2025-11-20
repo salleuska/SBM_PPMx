@@ -50,10 +50,8 @@ plot_psm_gg <- function(psm, title = "") {
 ## Settings
 ##---------------------------##
 
-## results_dir <- here("simulation", "results", "oneCov")
+results_dir <- here("simulation", "results", "oneCov")
 
-## if two covariates
-results_dir <- here("simulation", "results", "twoCov")
 
 burn_frac <- 0.2 # brunin
 thin_step <- 1   # eventual thinning
@@ -61,12 +59,25 @@ thin_step <- 1   # eventual thinning
 ##---------------------------##
 ## List result files
 ##---------------------------##
-## ---------------------------
+
+files_res <- list.files(
+  results_dir,
+  pattern = "^post.*\\.rds$",
+  full.names = TRUE
+)
+
+if (length(files_res) == 0L) {
+  stop("No result files found in ", results_dir)
+}
+
+cat("Found", length(files_res), "result files.\n")
+
+##---------------------------##
 ## Process each result
-## ---------------------------
+##---------------------------##
 
 summ_list <- vector("list", length(files_res))
-psm_list  <- vector("list", length(files_res))
+psm_list  <- vector("list", length(files_res))  # store PSMs here
 
 for (i in seq_along(files_res)) {
   f_res <- files_res[i]
@@ -74,104 +85,115 @@ for (i in seq_along(files_res)) {
 
   res <- readRDS(f_res)
 
-  ## Extract posterior samples and metadata
+  # Extract posterior samples and metadata
   Z_post   <- res$Z_post      # V x N_iter
-  scen_res <- res$scenario
+  alpha    <- res$alpha
   seed     <- res$seed
-  sim_path <- res$file
+  scen_res <- res$scenario
+  sim_path <- res$file        # path to original simulation .rds
 
-  # Two alphas: be slightly defensive
-  alpha1 <- if (!is.null(res$alpha1)) res$alpha1 else {
-    if (!is.null(res$alpha)) res$alpha else NA_real_
-  }
-  alpha2 <- if (!is.null(res$alpha2)) res$alpha2 else 0
-
-  # Load simulation to get true partition
   sim_obj <- readRDS(here(sim_path))
   z_true  <- sim_obj$partition
   V_true  <- length(z_true)
 
-  if (nrow(Z_post) != V_true) {
-    stop("Dimension mismatch: nrow(Z_post) != length(z_true) in ", f_res)
-  }
-
-  ## ---------------------------
-  ## Posterior similarity + VI clustering
-  ## ---------------------------
+  ##---------------------------####
+  ## estimate clustering via salso
+  ##---------------------------####
+  ## keep iterations after burnin
   T_total <- ncol(Z_post)
   burn    <- floor(T_total * burn_frac)
   keep_i  <- seq(from = burn + 1L, to = T_total, by = thin_step)
 
   Z_keep <- Z_post[, keep_i, drop = FALSE]   # V x T_keep
 
-  if (ncol(Z_keep) < 2L) {
-    stop("Too few post-burn-in samples after thinning in ", f_res)
-  }
-
-  # PSM (iterations x items → transpose)
-  coClust_prob <- psm(t(Z_keep))
+  # Posterior similarity matrix (PSM)
+  coClust_prob <- psm(t(Z_keep))    # iterations x items → transpose
 
   # VI representative clustering
   z_hat <- salso(t(Z_keep), loss = VI())
 
-  ## ---------------------------
+  ##---------------------------##
   ## ARI vs true clustering
-  ## ---------------------------
-  ari   <- mclust::adjustedRandIndex(z_hat, z_true)
+  ##---------------------------##
+
+  ari <- mclust::adjustedRandIndex(z_hat, z_true)
+
+  # Number of inferred clusters
   K_hat <- length(unique(z_hat))
 
-  # file base name
+  # Extract alpha tag & base name from filename (optional)
   base_name <- file_path_sans_ext(basename(f_res))
 
+  # store summary row
   summ_list[[i]] <- data.frame(
     file_res   = basename(f_res),
     sim_file   = sim_path,
     base_name  = base_name,
     scenario   = scen_res,
-    alpha1     = alpha1,
-    alpha2     = alpha2,
+    alpha      = alpha,
     seed       = seed,
     K_hat      = K_hat,
     ARI        = ari,
     stringsAsFactors = FALSE
   )
 
+  # store PSM in list
   psm_list[[i]] <- coClust_prob
 }
 
 summary_df <- do.call(rbind, summ_list)
-names(psm_list) <- summary_df$file_res
+names(psm_list) <- basename(files_res)
 
-## ---------------------------
-## Save summary + PSMs
-## ---------------------------
+##---------------------------##
+## Save summary and PSMs
+##---------------------------##
 
-out_csv <- file.path(results_dir, "summary_twoAlpha_binaryESBM.csv")
+out_csv <- file.path(results_dir, "summary_binaryESBM.csv")
 write.csv(summary_df, out_csv, row.names = FALSE)
 cat("Saved summary to:\n  ", out_csv, "\n")
 
-psm_out <- file.path(results_dir, "psm_twoAlpha_binaryESBM.rds")
+psm_out <- file.path(results_dir, "psm_binaryESBM.rds")
 saveRDS(psm_list, psm_out)
 cat("Saved PSM list to:\n  ", psm_out, "\n")
 
-## ---------------------------
-## ARI heatmaps over (alpha1, alpha2)
-## ---------------------------
+##---------------------------##
+## ARI vs alpha plot
+##---------------------------##
 
-# Simple ARI heatmap per scenario
-p_heat <- ggplot(summary_df,
-                 aes(x = alpha1, y = alpha2, fill = ARI)) +
-  geom_tile(color = "white") +
-  scale_fill_viridis_c(option = "plasma", direction = -1) +
-  facet_wrap(~ scenario) +
-  coord_equal() +
-  theme_minimal(base_size = 12) +
-  labs(
-    title = "ARI over (alpha1, alpha2) by scenario",
-    x = expression(alpha[1]),
-    y = expression(alpha[2]),
-    fill = "ARI"
-  )
+p <- ggplot(summary_df,
+            aes(x = alpha, y = ARI,
+                color = scenario,
+                group = interaction(scenario, seed))) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  ylim(c(0,1)) + 
+  labs(title = "ARI vs alpha",
+       x = expression(alpha),
+       y = "Adjusted Rand Index")
 
-print(p_heat)
+
+ggsave(p, file = here(results_dir, "alphaVsARI.pdf"))
+
+psm_list <- readRDS(here(results_dir, "psm_binaryESBM.rds"))
+psm_pdf <- file.path(results_dir, "psm_heatmaps_binaryESBM.pdf")
+pdf(psm_pdf, width = 5, height = 5)
+
+for (i in seq_len(nrow(summary_df))) {
+  file_res_i <- summary_df$file_res[i]
+  scen_i     <- summary_df$scenario[i]
+  alpha_i    <- summary_df$alpha[i]
+  seed_i     <- summary_df$seed[i]
+  
+  psm_i <- psm_list[[file_res_i]]
+  
+  title_i <- sprintf("Scenario: %s\nalpha = %.2f, seed = %d",
+                     scen_i, alpha_i, seed_i)
+  
+  print(plot_psm_gg(psm_i, title_i))
+}
+
+dev.off()
+
+cat("Saved PSM heatmaps to:\n  ", psm_pdf, "\n")
 

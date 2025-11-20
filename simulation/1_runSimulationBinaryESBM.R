@@ -21,12 +21,12 @@ if (is.null(args$data_path)) {
   data_path <- args$data_path
 }
 
-# alpha (default 1)
-if (is.null(args$alpha)) {
-  alpha_in <- 1
-} else {
-  alpha_in <- as.numeric(args$alpha)
-}
+# alpha1, alpha2 for two covariates
+alpha1_in <- if (is.null(args$alpha1)) 0 else as.numeric(args$alpha1)
+alpha2_in <- if (is.null(args$alpha2)) 0 else as.numeric(args$alpha2)
+
+cat("  alpha1  =", alpha1_in, "\n")
+cat("  alpha2  =", alpha2_in, "\n\n")
 
 # seed (default 123)
 if (is.null(args$seed)) {
@@ -41,12 +41,6 @@ if (is.null(args$N_iter)) {
 } else {
   N_iter <- as.integer(args$N_iter)
 }
-
-cat("Running ESBM with:\n")
-cat("  file     =", data_path, "\n")
-cat("  alpha    =", alpha_in, "\n")
-cat("  seed     =", seed, "\n")
-cat("  N_iter   =", N_iter, "\n\n")
 
 ## -------------------------------
 ## Source ESBM code
@@ -100,7 +94,7 @@ if (scenario == "none") {
   x_df           <- NULL
   similarity_fun <- NULL
   sim_args       <- list()
-  alpha_g_vec    <- 1
+  alpha_g_vec <- c(alpha1_in, alpha2_in)
 
 } else if (scenario == "one") {
 
@@ -108,7 +102,7 @@ if (scenario == "none") {
 
   similarity_fun <- similarity_ppmx_gaussian_mean
   sim_args       <- list(list(m0 = 0, s0 = sqrt(1)))
-  alpha_g_vec    <- alpha_in
+  alpha_g_vec <- c(alpha1_in, alpha2_in)
 
 } else if (scenario == "both") {
 
@@ -127,7 +121,7 @@ if (scenario == "none") {
     list(m0 = 0, s0 = sqrt(1))
   )
 
-  alpha_g_vec <- rep(alpha_in, 2)
+  alpha_g_vec <- c(alpha1_in, alpha2_in)
 }
 
 ## -------------------------------
@@ -159,21 +153,22 @@ cat("Sampler finished.\n\n")
 out_dir <- here("simulation", "results", "twoCov")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
-alpha_tag <- gsub("\\.", "p", sprintf("%.2f", alpha_in))
-
+alpha1_tag <- gsub("\\.", "p", sprintf("%.2f", alpha1_in))
+alpha2_tag <- gsub("\\.", "p", sprintf("%.2f", alpha2_in))
 base_name <- file_path_sans_ext(basename(data_path))
 
 out_file <- file.path(
   out_dir,
-  sprintf("post_%s_alpha-%s_seed-%d.rds",
-          base_name, alpha_tag, seed)
+  sprintf("postTwoCov_%s_a1-%s_a2-%s_seed-%d.rds",
+          base_name, alpha1_tag, alpha2_tag, seed)
 )
+
 
 saveRDS(
   list(
     Z_post    = Z_post,
     file    = data_path,
-    alpha   = alpha_in,
+    alpha   = alpha_g_vec,
     N_iter  = N_iter,
     scenario= scenario,
     seed = seed

@@ -1,0 +1,160 @@
+---
+title: "Notes on simulation"
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+```{r}
+#| echo: false
+#| message: false
+
+library(here)
+library(igraph)
+library(ggplot2)
+library(RColorBrewer)
+
+#------------------------------------------------------------------#
+# Plotting functions
+#------------------------------------------------------------------#
+plot_network_geo <- function(sim_obj, main = NULL) {
+  Y <- sim_obj$Y
+  x <- sim_obj$x
+  z <- sim_obj$partition
+
+  g <- igraph::graph_from_adjacency_matrix(
+    Y,
+    mode = "undirected",
+    diag = FALSE
+  )
+
+  layout_xy <- as.matrix(x)   # use (x1, x2) as coordinates
+
+  K    <- length(unique(z))
+  pal  <- c(1, 2, 3,4)
+  vcol <- pal[z]
+
+  if (is.null(main)) {
+    main <- paste0("Network with geographic layout (cov_dep = '",
+                   sim_obj$cov_dep, "')")
+  }
+
+  plot(
+    g,
+    layout         = layout_xy,
+    vertex.color   = vcol,
+    vertex.size    = 6,
+    vertex.label   = NA,
+    edge.arrow.mode = 0,
+    main           = main
+  )
+}
+
+
+plot_adj_matrix_gg <- function(sim_obj) {
+  Y  <- sim_obj$Y
+  z0 <- sim_obj$partition
+  V  <- length(z0)
+  
+  # remove self-loops
+  diag(Y) <- 0
+  
+  #------------------------------------------#
+  # Order nodes by true cluster to show blocks
+  #------------------------------------------#
+  ord   <- order(z0)
+  Y_ord <- Y[ord, ord]
+  z_ord <- z0[ord]
+  
+  #------------------------------------------#
+  # Build long data.frame in base R
+  #------------------------------------------#
+  # indices
+  grid_idx <- expand.grid(
+    row = seq_len(V),
+    col = seq_len(V)
+  )
+  
+  # adjacency values (row-major)
+  grid_idx$value <- as.vector(Y_ord)
+  
+  # factors for plotting:
+  # flip row so cluster 1 is at bottom (heatmap style)
+  grid_idx$row_f <- factor(grid_idx$row,
+                           levels = rev(seq_len(V)))
+  grid_idx$col_f <- factor(grid_idx$col,
+                           levels = seq_len(V))
+  
+  # cluster label per row (after ordering)
+  grid_idx$cluster <- factor(z_ord[grid_idx$row])
+  
+  #------------------------------------------#
+  # Colors
+  #------------------------------------------#
+  adj_pal <- colorRampPalette(
+    brewer.pal(9, "Greys")[c(1, 9)]
+  )(50)
+  
+  #------------------------------------------#
+  # Plot
+  #------------------------------------------#
+  ggplot(grid_idx, aes(x = col_f, y = row_f, fill = value)) +
+    geom_tile() +
+    scale_fill_gradientn(colors = adj_pal, guide = "none") +
+    coord_fixed() +
+    theme_minimal(base_size = 12) +
+    theme(
+      axis.text.x  = element_blank(),
+      axis.text.y  = element_blank(),
+      axis.title   = element_blank(),
+      panel.grid   = element_blank()
+    ) +
+    ggtitle("Adjacency matrix")
+}
+
+
+```
+
+
+## Simulation design
+
+We consider a transportation--network setting in which each node is characterized by two covariates that can be interpreted as a geographic location (longitude and latitude). The network contains $150$ nodes partitioned into four clusters of sizes $(50, 40, 30, 30)$. Edges are generated from a stochastic block model with higher within--cluster than between--cluster connection probabilities (0.4 vs 0.2).  We examine three scenarios, which determine how informative the geographic coordinates are about the true clusters: (i) \emph{no covariate effect}, where both coordinates are independent of the clusters; (ii) \emph{single--coordinate effect}, where only the first coordinate varies across clusters and the second is noise; and (iii) \emph{two--coordinate effect}, where both coordinates differ across clusters and thus jointly reveal the underlying community structure. 
+
+
+```{r}
+#| layout-ncol: 2
+sim_none  <- readRDS(here("simulation", "data", "binarySBM_none.rds"))
+sim_one  <- readRDS(here("simulation", "data", "binarySBM_one.rds"))
+sim_both  <- readRDS(here("simulation", "data", "binarySBM_both.rds"))
+
+
+plot_adj_matrix_gg(sim_none)
+plot_network_geo(sim_none)
+plot_network_geo(sim_one)
+plot_network_geo(sim_both)
+```
+
+
+For the simulation study we run the ESBM gibbs with the following settings 
+
+- Block probabilities:
+  - Each entry of the block matrix has a $\text{Beta}(a,b)$ prior with
+    $a = 1$, $b = 1$ (uniform on $(0,1)$).
+- Random partition prior:
+  - We use a Dirichlet–multinomial (DM) prior on cluster allocations, with concentration parameter $\beta_{\text{DM}} = 1$ and $H_{\text{DM}} = 4$ (same as simulation for now)
+- Similary function for the covariante is a Gaussian pseduo model
+
+$$
+  x_i \mid \mu_h \sim N(\mu_h, 1), \qquad
+  \mu_h \sim N(m_0, s_0^2),
+$$
+
+with $(m_0, s_0^2) = (0, 1)$, 
+    
+- $alpha$ is fixed and not sampled at values $(0,0.5, 1, 2, 4)$
+
+We run the MCMC for 10000 iterations
+
+### Results
+
