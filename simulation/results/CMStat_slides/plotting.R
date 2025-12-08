@@ -1,43 +1,13 @@
 ################################
 ## File for plotting 
-library(here)
 library(ggplot2)
 library(RColorBrewer)
+library(cowplot)
 ################################
-plot_psm_gg <- function(psm, title = "") {
-  V <- nrow(psm)
-  
-  # long data.frame in base R
-  grid_idx <- expand.grid(
-    row = seq_len(V),
-    col = seq_len(V)
-  )
-  grid_idx$value <- as.vector(psm)
-  
-  # flip rows so origin is bottom-left like a matrix
-  grid_idx$row_f <- factor(grid_idx$row, levels = rev(seq_len(V)))
-  grid_idx$col_f <- factor(grid_idx$col, levels = seq_len(V))
-  
-  pal <- colorRampPalette(brewer.pal(9, "Blues"))(50)
-  
-  ggplot(grid_idx, aes(x = col_f, y = row_f, fill = value)) +
-    geom_tile() +
-    scale_fill_gradientn(colors = pal, limits = c(0, 1)) +
-    coord_fixed() +
-    theme_minimal(base_size = 11) +
-    theme(
-      axis.text.x  = element_blank(),
-      axis.text.y  = element_blank(),
-      axis.title   = element_blank(),
-      panel.grid   = element_blank(),
-      plot.title   = element_text(hjust = 0.5)
-    ) +
-    ggtitle(title)
-}
-######
-## read result files
-res_none <- readRDS(here("simulation", "results", "scenario_none_results.rds"))
-res_one <- readRDS(here("simulation", "results", "scenario_none_results.rds"))
+
+## read files with results
+res_none <- readRDS("scenario_none_results.rds")
+res_one <- readRDS("scenario_one_results.rds")
 
 
 ######
@@ -57,52 +27,147 @@ df <- rbind(
   extract_df(res_one,  "one")
 )
 
+## exclude alpha = 4
+df <- df[!(df$alpha ==4), ]
+
 df$scenario <- factor(df$scenario, levels = c("none", "one"))
 df <- df[order(df$alpha), ]
 
 p_ari <- ggplot(df, aes(x = alpha, y = ARI, color = scenario)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  theme_minimal(base_size = 14) +
+  scale_x_continuous(breaks = unique(df$alpha)) +
+  scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  labs(
+    title = "ARI between the estimated partition and true clustering",
+    x     = expression(alpha),
+    y     = expression(ARI(hat(z), z[0]))
+  ) +
+  theme(
+    plot.title      = element_text(face = "bold"),
+    legend.title    = element_blank(),
+    legend.position = "right"
+  )
+p_ari
+
+
+### Silhouette ###
+p_sil <- ggplot(df, aes(x = alpha, y = silhouette, color = scenario)) +
   geom_point(size = 3) +
   geom_line() +
   theme_minimal(base_size = 14) +
   labs(
-    title = "ARI vs α",
+    title = "Silhouette vs α",
     x = expression(alpha),
-    y = "Adjusted Rand Index"
+    y = "Average silhouette width"
   )
 
-print(p_ari)
+print(p_sil)
 
+#######
+plot_psm_with_annotations <- function(psm, z_true, z_est) {
 
+  require(pheatmap)
+  require(cowplot)
 
-p <- ggplot(summary_df,
-            aes(x = alpha, y = ARI,
-                color = scenario,
-                group = interaction(scenario, seed))) +
-  geom_point() +
-  geom_line() +
-  theme_minimal() +
-  ylim(c(0,1)) + 
-  labs(title = "ARI vs alpha",
-       x = expression(alpha),
-       y = "Adjusted Rand Index")
+  n <- nrow(psm)
 
+  ## rownames for the co-occurence probability matrix
+  rn <- paste0("i", seq_len(n))
+  rownames(psm) <- rn
 
-ggsave(p, file = here(results_dir, "alphaVsARI.pdf"))
+  ## dataframe for annotation on the left side (clustering info)
+  ann <- data.frame(
+    est  = factor(z_est),
+    true = factor(z_true)
+  )
+  rownames(ann) <- rn
 
-psm_list <- readRDS(here(results_dir, "psm_binaryESBM.rds"))
-psm_pdf <- file.path(results_dir, "psm_heatmaps_binaryESBM.pdf")
-pdf(psm_pdf, width = 5, height = 5)
+  ###############################
+  ## colors for the trues clusters
+  lev_true <- levels(ann$true)
+  K0 <- length(lev_true)
 
-for (i in seq_len(nrow(summary_df))) {
-  file_res_i <- summary_df$file_res[i]
-  scen_i     <- summary_df$scenario[i]
-  alpha_i    <- summary_df$alpha[i]
-  seed_i     <- summary_df$seed[i]
-  
-  psm_i <- psm_list[[file_res_i]]
-  
-  title_i <- sprintf("Scenario: %s\nalpha = %.2f, seed = %d",
-                     scen_i, alpha_i, seed_i)
-  
-  print(plot_psm_gg(psm_i, title_i))
+  okabe_ito <- c(
+    "#E69F00", "#56B4E9", "#009E73",
+    "#D55E00", "#CC79A7", "#0072B2",
+    "#F0E442", "#999999"
+  )
+
+  ## set colors for true partition
+  lev_true <- levels(ann$true)
+  cols_true <- okabe_ito[seq_len(length(lev_true))]
+  names(cols_true) <- lev_true
+
+  ## set colors for estimated partition
+  lev_est <- levels(ann$est)
+  cols_est <- okabe_ito[seq_len(length(lev_est))]
+  names(cols_est) <- lev_est
+
+  annotation_colors <- list(
+    true = cols_true,
+    est  = cols_est
+  )
+
+  ## Greyscale palette for co-clustering probabilities
+  mat_cols <- colorRampPalette(c("white", "black"))(60)
+
+  p <- pheatmap(
+    psm,
+    color          = mat_cols,
+    cluster_rows   = FALSE,
+    cluster_cols   = FALSE,
+    show_rownames  = FALSE,
+    show_colnames  = FALSE,
+    annotation_row = ann,
+    annotation_colors = annotation_colors,
+    border_color   = NA,
+    annotation_legend = FALSE,
+    legend         = FALSE,
+    gaps_row=c(which(diff(z_true)!=0)),
+    gaps_col=c(which(diff(z_true)!=0))
+  )
+
+  ggdraw(p[[4]])
 }
+
+
+alpha0 <- res_one$results$alpha_0.00
+
+p_alpha0 <- plot_psm_with_annotations(
+  psm    = alpha0$psm,
+  z_true = res_one$sim$partition_true,
+  z_est  = alpha0$z_hat
+)
+
+ggsave(alpha0, )
+alpha05 <- res_one$results$alpha_0.50
+
+p_alpha05 <- plot_psm_with_annotations(
+  psm    = alpha05$psm,
+  z_true = res_one$sim$partition_true,
+  z_est  = alpha05$z_hat
+)
+
+alpha1 <- res_one$results$alpha_1.00
+
+p_alpha1 <- plot_psm_with_annotations(
+  psm    = alpha1$psm,
+  z_true = res_one$sim$partition_true,
+  z_est  = alpha1$z_hat
+)
+
+alpha2 <- res_one$results$alpha_2.00
+
+p_alpha2 <- plot_psm_with_annotations(
+  psm    = alpha2$psm,
+  z_true = res_one$sim$partition_true,
+  z_est  = alpha2$z_hat
+)
+
+p_alpha0
+p_alpha05
+p_alpha1
+p_alpha2
+
