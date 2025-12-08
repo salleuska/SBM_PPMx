@@ -111,7 +111,6 @@ res_for_scenario <- function(sim_path, scenario_files) {
       ARI_vi      = ARI_vi,        # ARI of VI estimate
       ARI_mean    = ARI_mean,      # posterior mean ARI
       ARI_sd      = ARI_sd,        # posterior sd ARI
-      ARI_iter    = ARI_iter,      # (optional) full vector
       silhouette  = list(object = sil_obj, mean = sil_mean),
       psm         = psm_mat,
       seed        = seed,
