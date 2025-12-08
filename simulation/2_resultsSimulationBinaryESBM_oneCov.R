@@ -10,6 +10,7 @@ library(here)
 library(mclust)     # ARI
 library(tools)      # file_path_sans_ext
 library(salso)      # point estimate for the clustering
+library(cluster)    # to compute silhouette
 ##---------------------------##
 ## Settings
 ##---------------------------##
@@ -90,7 +91,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
 
     ## silhouette (distance = 1 − PSM)
     diss_mat <- 1 - psm_mat
-    sil_obj  <- cluster::silhouette(z_hat, dist(diss_mat))
+    sil_obj  <- silhouette(z_hat, dist(diss_mat))
     sil_mean <- mean(sil_obj[, 3])
 
     ## tag (clean list name)
@@ -127,7 +128,8 @@ saveRDS(
 ## Build & save for scenario ONE
 ##---------------------------------------------------------##
 combined_one <- res_for_scenario(sim_path_one, files_one)
-
+ 
+ 
 saveRDS(
   combined_one,
   here("simulation", "results", "scenario_one_results.rds")

@@ -1,7 +1,9 @@
+################################
+## File for plotting 
 library(here)
 library(ggplot2)
 library(RColorBrewer)
-
+################################
 plot_psm_gg <- function(psm, title = "") {
   V <- nrow(psm)
   
@@ -32,6 +34,44 @@ plot_psm_gg <- function(psm, title = "") {
     ) +
     ggtitle(title)
 }
+######
+## read result files
+res_none <- readRDS(here("simulation", "results", "scenario_none_results.rds"))
+res_one <- readRDS(here("simulation", "results", "scenario_none_results.rds"))
+
+
+######
+extract_df <- function(obj, scen_name) {
+  alphas <- names(obj$results)
+
+  data.frame(
+    scenario = scen_name,
+    alpha    = as.numeric(sub("alpha_", "", alphas)),
+    ARI      = sapply(obj$results, function(r) r$ARI),
+    silhouette = sapply(obj$results, function(r) r$silhouette$mean)
+  )
+}
+
+df <- rbind(
+  extract_df(res_none, "none"),
+  extract_df(res_one,  "one")
+)
+
+df$scenario <- factor(df$scenario, levels = c("none", "one"))
+df <- df[order(df$alpha), ]
+
+p_ari <- ggplot(df, aes(x = alpha, y = ARI, color = scenario)) +
+  geom_point(size = 3) +
+  geom_line() +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "ARI vs α",
+    x = expression(alpha),
+    y = "Adjusted Rand Index"
+  )
+
+print(p_ari)
+
 
 
 p <- ggplot(summary_df,
