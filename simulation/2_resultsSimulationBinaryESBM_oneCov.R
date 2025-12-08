@@ -21,7 +21,7 @@ sim_path_none <- here("simulation", "data", "binarySBM_none.rds")
 sim_path_one <- here("simulation", "data", "binarySBM_one.rds")
 
 ## MCMC
-burn_frac <- 0.2 # brunin
+burn_frac <- 0.4 # brunin
 thin_step <- 1   # eventual thinning
 
 
@@ -61,7 +61,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
     results = list()   # ONLY results grouped by alpha
   )
 
-  ## LOOP OVER POSTERIOR FILES
+  ## loop over results files
   for (f in scenario_files) {
 
     cat("Processing:", basename(f), "\n")
@@ -83,32 +83,42 @@ res_for_scenario <- function(sim_path, scenario_files) {
     ## PSM
     psm_mat <- psm(t(Z_keep))
 
-    ## VI representative clustering
+    ## estimate of the clusering using VI 
     z_hat <- salso(t(Z_keep), loss = VI())
+    
+    ## ARI for VI representative
+    ARI_vi <- adjustedRandIndex(z_hat, z_true)
 
-    ## ARI
-    ARI_val <- mclust::adjustedRandIndex(z_hat, z_true)
+    ## ARI across iterations
+    ARI_iter <- apply(
+      Z_keep, 2L,
+      function(z_t) adjustedRandIndex(z_t, z_true)
+    )
+    ARI_mean <- mean(ARI_iter)
+    ARI_sd   <- sd(ARI_iter)
 
     ## silhouette (distance = 1 − PSM)
     diss_mat <- 1 - psm_mat
     sil_obj  <- silhouette(z_hat, dist(diss_mat))
     sil_mean <- mean(sil_obj[, 3])
 
-    ## tag (clean list name)
     tag <- sprintf("alpha_%0.2f", alpha)
 
-    ## store entry
     combined$results[[tag]] <- list(
-      alpha      = alpha,
-      Z_post     = Z_post,
-      z_hat      = z_hat,
-      ARI        = ARI_val,
-      silhouette = list(object = sil_obj, mean = sil_mean),
-      psm        = psm_mat,
-      seed       = seed,
-      N_iter     = N_iter
+      alpha       = alpha,
+      Z_post      = Z_post,
+      z_hat       = z_hat,
+      ARI_vi      = ARI_vi,        # ARI of VI estimate
+      ARI_mean    = ARI_mean,      # posterior mean ARI
+      ARI_sd      = ARI_sd,        # posterior sd ARI
+      ARI_iter    = ARI_iter,      # (optional) full vector
+      silhouette  = list(object = sil_obj, mean = sil_mean),
+      psm         = psm_mat,
+      seed        = seed,
+      N_iter      = N_iter
     )
   }
+
 
   combined
 }
@@ -117,6 +127,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
 ## Build & save for scenario NONE
 ##---------------------------------------------------------##
 combined_none <- res_for_scenario(sim_path_none, files_none)
+
 
 saveRDS(
   combined_none,
