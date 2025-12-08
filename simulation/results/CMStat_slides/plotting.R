@@ -1,7 +1,7 @@
 ################################
 ## script for producing plots 
 library(ggplot2)
-library(RColorBrewer)1
+library(RColorBrewer)
 library(cowplot)
 ################################
 ## read files with results

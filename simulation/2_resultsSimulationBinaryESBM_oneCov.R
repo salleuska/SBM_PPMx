@@ -130,7 +130,7 @@ combined_none <- res_for_scenario(sim_path_none, files_none)
 
 saveRDS(
   combined_none,
-  here("simulation", "results", "scenario_none_results.rds")
+  here("simulation", "results", "CMStat_slides", "scenario_none_results.rds")
 )
 
 
@@ -142,7 +142,7 @@ combined_one <- res_for_scenario(sim_path_one, files_one)
  
 saveRDS(
   combined_one,
-  here("simulation", "results", "scenario_one_results.rds")
+  here("simulation", "results", "CMStat_slides", "scenario_one_results.rds")
 )
 
 
