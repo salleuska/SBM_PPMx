@@ -107,7 +107,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
     combined$results[[tag]] <- list(
       alpha       = alpha,
       Z_post      = Z_post,
-      z_hat       = z_hat,
+      z_hat       = as.integer(z_hat),
       ARI_vi      = ARI_vi,        # ARI of VI estimate
       ARI_mean    = ARI_mean,      # posterior mean ARI
       ARI_sd      = ARI_sd,        # posterior sd ARI
