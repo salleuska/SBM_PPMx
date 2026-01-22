@@ -16,23 +16,24 @@ library(cluster)    # to compute silhouette
 ##---------------------------##
 
 ## Paths to results directory and simulation files
-results_dir <- here("simulation", "results", "oneCov")
+results_dir <- here("simulation", "results", "twoCov")
 sim_path_none <- here("simulation", "data", "binarySBM_none.rds")
 sim_path_one <- here("simulation", "data", "binarySBM_one.rds")
+sim_path_both <- here("simulation", "data", "binarySBM_both.rds")
 
 ## MCMC
 burn_frac <- 0.4 # brunin
 thin_step <- 1   # eventual thinning
 
 
-files_res   <- list.files(results_dir, pattern = "^postOneCov_.*\\.rds$", full.names = TRUE)
+files_res   <- list.files(results_dir, pattern = "^postTwoCov_.*\\.rds$", full.names = TRUE)
 
 ##---------------------------------------------------------##
 ## List files and split by scenario keyword
 ##---------------------------------------------------------##
 files_all <- list.files(
   results_dir,
-  pattern = "^postOneCov_.*\\.rds$",
+  pattern = "^postTwoCov_.*\\.rds$",
   full.names = TRUE
 )
 

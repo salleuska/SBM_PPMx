@@ -89,40 +89,27 @@ cat("Simulation scenario =", scenario, "\n\n")
 ## -------------------------------
 ## Prepare x, similarity_fun, sim_args, alpha
 ## -------------------------------
-if (scenario == "none") {
 
-  x_df           <- NULL
-  similarity_fun <- NULL
-  sim_args       <- list()
-  alpha_g_vec <- c(alpha1_in, alpha2_in)
+## define data frame with two covariates
+x_df <- data.frame(
+  x1 = x[, 1],
+  x2 = x[, 2]
+)
 
-} else if (scenario == "one") {
+# always provide two similarity components
+similarity_fun <- list(
+  similarity_ppmx_gaussian_mean,
+  similarity_ppmx_gaussian_mean
+)
 
-  x_df <- data.frame(x1 = x[, 1])
+# always provide args for both components
+sim_args <- list(
+  list(m0 = 0, s0 = sqrt(1)),
+  list(m0 = 0, s0 = sqrt(1))
+)
 
-  similarity_fun <- similarity_ppmx_gaussian_mean
-  sim_args       <- list(list(m0 = 0, s0 = sqrt(1)))
-  alpha_g_vec <- c(alpha1_in, alpha2_in)
-
-} else if (scenario == "both") {
-
-  x_df <- data.frame(
-    x1 = x[, 1],
-    x2 = x[, 2]
-  )
-
-  similarity_fun <- list(
-    similarity_ppmx_gaussian_mean,
-    similarity_ppmx_gaussian_mean
-  )
-
-  sim_args <- list(
-    list(m0 = 0, s0 = sqrt(1)),
-    list(m0 = 0, s0 = sqrt(1))
-  )
-
-  alpha_g_vec <- c(alpha1_in, alpha2_in)
-}
+# always provide two alphas
+alpha_g_vec <- c(alpha1_in, alpha2_in)
 
 ## -------------------------------
 ## Run ESBM
