@@ -227,7 +227,7 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
           log_g_j_n <- log_g_j - lse_j                 # log normalized g_j
 
           # add covariate similarity, weighted by alpha_g[j]
-          log_similarity_g <- log_similarity_g + alpha_g[j] * log_g_j_n
+          log_similarity_g <- log_similarity_g + (alpha_g[j] * log_g_j_n)
         }
       }
      
