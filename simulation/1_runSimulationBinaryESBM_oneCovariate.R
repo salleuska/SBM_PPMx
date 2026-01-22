@@ -5,9 +5,9 @@ library(tools)
 
 args <- R.utils::commandArgs(asValue = TRUE)
 
-## -------------------------------
+## ------------------------------- ##
 ## Parse args
-## -------------------------------
+## ------------------------------- ##
 
 if (is.null(args$data_path)) {
   stop("Please provide data_path=path/to/simulated.rds")
@@ -25,16 +25,16 @@ cat("  alpha    =", alpha_in, "\n")
 cat("  seed     =", seed, "\n")
 cat("  N_iter   =", N_iter, "\n\n")
 
-## -------------------------------
+## ------------------------------- ##
 ## Load code
-## -------------------------------
+## ------------------------------- ##
 source(here("R_utilties", "esbm.R"))
 source(here("R_utilties", "similarity_functions.R"))
 Rcpp::sourceCpp(here("R_utilties", "stirling.cpp"))
 
-## -------------------------------
+## ------------------------------- ##
 ## Hyperparameters
-## -------------------------------
+## ------------------------------- ##
 a       <- 1
 b       <- 1
 beta_dm <- 1
@@ -42,18 +42,18 @@ H_dm    <- 4
 
 set.seed(seed)
 
-## -------------------------------
+## ------------------------------- ##
 ## Load simulation
-## -------------------------------
+## ------------------------------- ##
 sim_obj <- readRDS(data_path)
 
 Y  <- sim_obj$Y
 x  <- sim_obj$x              # matrix n x 1 or n x 2 but we use only first
 z0 <- sim_obj$partition
 
-## -------------------------------
+## ------------------------------- ##
 ## Infer scenario (none / one)
-## -------------------------------
+## ------------------------------- ##
 fname <- basename(data_path)
 
 if (grepl("none", fname, ignore.case = TRUE)) {
@@ -66,28 +66,19 @@ if (grepl("none", fname, ignore.case = TRUE)) {
 
 cat("Scenario:", scenario, "\n\n")
 
-## -------------------------------
+## ------------------------------- ##
 ## Prepare covariate and similarity
-## -------------------------------
-if (scenario == "none") {
+## ------------------------------- ##
 
-  x_df           <- NULL
-  similarity_fun <- NULL
-  sim_args       <- list()
-  alpha_vec      <- 1
+x_df <- data.frame(x1 = x[, 1])
 
-} else {  # scenario == "one"
+similarity_fun <- similarity_ppmx_gaussian_mean
+sim_args       <- list(list(m0 = 0, s0 = sqrt(1)))
+alpha_vec      <- alpha_in
 
-  x_df <- data.frame(x1 = x[, 1])
-
-  similarity_fun <- similarity_ppmx_gaussian_mean
-  sim_args       <- list(list(m0 = 0, s0 = sqrt(1)))
-  alpha_vec      <- alpha_in
-}
-
-## -------------------------------
+## ------------------------------- ##
 ## Run ESBM
-## -------------------------------
+## ------------------------------- ##
 cat("Starting ESBM...\n")
 
 Z_post <- esbm(
@@ -108,9 +99,9 @@ Z_post <- esbm(
 
 cat("Done.\n\n")
 
-## -------------------------------
+## ------------------------------- ##
 ## Save output
-## -------------------------------
+## ------------------------------- ##
 out_dir <- here("simulation", "results", "oneCov")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
