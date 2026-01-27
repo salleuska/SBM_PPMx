@@ -48,20 +48,25 @@ set.seed(seed)
 sim_obj <- readRDS(data_path)
 
 Y  <- sim_obj$Y
-x  <- sim_obj$x              # matrix n x 1 or n x 2 but we use only first
+x  <- sim_obj$x              # matrix n x 2; use only first column for one-cov runs
 z0 <- sim_obj$partition
 
 ## ------------------------------- ##
-## Infer scenario (neutral / one)
+## Infer scenario 
 ## ------------------------------- ##
+f## Infer scenario from filename
 fname <- basename(data_path)
 
-if (grepl("neutral", fname, ignore.case = TRUE)) {
+if (grepl("1cov_neutral", fname, ignore.case = TRUE)) {
   scenario <- "neutral"
-} else if (grepl("one", fname, ignore.case = TRUE)) {
-  scenario <- "one"
+} else if (grepl("1cov_informative", fname, ignore.case = TRUE)) {
+  scenario <- "informative"
+} else if (grepl("1cov_mislead_random", fname, ignore.case = TRUE)) {
+  scenario <- "mislead_random"
+} else if (grepl("1cov_mislead_shifted", fname, ignore.case = TRUE)) {
+  scenario <- "mislead_shifted"
 } else {
-  stop("Filename must contain 'neutral' or 'one'. Found: ", fname)
+  stop("Filename must contain one of: 1cov_neutral / 1cov_informative / 1cov_mislead_random / 1cov_mislead_shifted. Found: ", fname)
 }
 
 cat("Scenario:", scenario, "\n\n")

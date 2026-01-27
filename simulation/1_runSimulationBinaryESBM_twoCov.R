@@ -8,11 +8,11 @@ suppressPackageStartupMessages({
 ## ------------------------------- ##
 ## Parse command-line args
 ## example
-args <- list()
-args$data_path= "simulation/data/binarySBM_one.rds"
-args$alpha1=1
-args$alpha2=2
-args$seed=13
+# args <- list()
+# args$data_path= "simulation/data/binarySBM_one.rds"
+# args$alpha1=1
+# args$alpha2=2
+# args$seed=13
 ## ------------------------------- ##
 args <- R.utils::commandArgs(asValue = TRUE)
 
@@ -75,15 +75,17 @@ z0 <- sim_obj$partition
 ## ------------------------------- ##
 fname <- basename(data_path)
 
-if (grepl("neutral", fname, ignore.case = TRUE)) {
-  scenario <- "neutral"
-} else if (grepl("one", fname, ignore.case = TRUE)) {
-  scenario <- "one"
-} else if (grepl("both", fname, ignore.case = TRUE)) {
-  scenario <- "both"
+if (grepl("2cov_NN", fname, ignore.case = TRUE)) {
+  scenario <- "NN"
+} else if (grepl("2cov_IN", fname, ignore.case = TRUE)) {
+  scenario <- "IN"
+} else if (grepl("2cov_NI", fname, ignore.case = TRUE)) {
+  scenario <- "NI"
+} else if (grepl("2cov_II", fname, ignore.case = TRUE)) {
+  scenario <- "II"
 } else {
-  stop("Cannot infer scenario from file name: ", fname,
-       "\nExpected it to include 'neutral', 'one', or 'both'.")
+  stop("Cannot infer two-cov scenario from file name: ", fname,
+       "\nExpected it to include one of: 2cov_NN / 2cov_IN / 2cov_NI / 2cov_II.")
 }
 
 cat("Simulation scenario =", scenario, "\n\n")
