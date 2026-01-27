@@ -17,9 +17,10 @@ library(cluster)    # to compute silhouette
 
 ## Paths to results directory and simulation files
 results_dir <- here("simulation", "results", "oneCov")
-sim_path_none <- here("simulation", "data", "binarySBM_neutral.rds")
-sim_path_one <- here("simulation", "data", "binarySBM_one.rds")
-# sim_path_both <- here("simulation", "data", "binarySBM_both.rds")
+sim_path_neutral   <- here("simulation", "data", "binarySBM_1cov_neutral.rds")
+sim_path_info      <- here("simulation", "data", "binarySBM_1cov_informative.rds")
+sim_path_mis_rand  <- here("simulation", "data", "binarySBM_1cov_mislead_random.rds")
+sim_path_mis_shift <- here("simulation", "data", "binarySBM_1cov_mislead_shifted.rds")
 
 ## MCMC
 burn_frac <- 0.4 # brunin
@@ -37,11 +38,15 @@ files_all <- list.files(
   full.names = TRUE
 )
 
-files_none <- files_all[grepl("_none", basename(files_all), ignore.case = TRUE)]
-files_one  <- files_all[grepl("_one",  basename(files_all), ignore.case = TRUE)]
+files_neutral   <- files_all[grepl("1cov_neutral",   basename(files_all), ignore.case = TRUE)]
+files_info      <- files_all[grepl("1cov_informative", basename(files_all), ignore.case = TRUE)]
+files_mis_rand  <- files_all[grepl("1cov_mislead_random", basename(files_all), ignore.case = TRUE)]
+files_mis_shift <- files_all[grepl("1cov_mislead_shifted", basename(files_all), ignore.case = TRUE)]
 
-cat("Found", length(files_none), "files for scenario NONE\n")
-cat("Found", length(files_one),  "files for scenario ONE\n\n")
+cat("Found", length(files_neutral), "files for scenario NEUTRAL\n")
+cat("Found", length(files_info), "files for scenario INFO \n")
+cat("Found", length(files_mis_rand), "files for scenario mis_rand\n")
+cat("Found", length(files_mis_shift), "files for scenario mis_shift\n")
 
 res_for_scenario <- function(sim_path, scenario_files) {
 
@@ -49,7 +54,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
   sim_obj <- readRDS(sim_path)
   z_true  <- sim_obj$partition
 
-  ## prepare combined structure — NO meta
+  ## prepare combined structure - info form simulation
   combined <- list(
     sim = list(
       Y              = sim_obj$Y,
@@ -57,7 +62,9 @@ res_for_scenario <- function(sim_path, scenario_files) {
       partition_true = sim_obj$partition,
       block_probs    = sim_obj$block_probs,
       clust_sizes    = sim_obj$clust_sizes,
-      cov_dep        = sim_obj$cov_dep
+      nCov           = sim_obj$nCov,
+      cov1Dep        = sim_obj$cov1Dep,
+      cov2Dep        = sim_obj$cov2Dep
     ),
     results = list()   # ONLY results grouped by alpha
   )
@@ -124,26 +131,20 @@ res_for_scenario <- function(sim_path, scenario_files) {
 }
 
 ##---------------------------------------------------------##
-## Build & save for scenario NONE
+## Build res & save for seach scenarion
 ##---------------------------------------------------------##
-combined_none <- res_for_scenario(sim_path_none, files_none)
-
-
-saveRDS(
-  combined_none,
-  here("simulation", "results", "CMStat_slides", "scenario_none_results.rds")
-)
-
+out_dir <- here("simulation", "results", "processed", "oneCov")
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 ##---------------------------------------------------------##
-## Build & save for scenario ONE
+## Build combined objects (one-cov scenarios)
 ##---------------------------------------------------------##
-combined_one <- res_for_scenario(sim_path_one, files_one)
- 
- 
-saveRDS(
-  combined_one,
-  here("simulation", "results", "CMStat_slides", "scenario_one_results.rds")
-)
+combined_neutral   <- res_for_scenario(sim_path_neutral,   files_neutral)
+combined_info      <- res_for_scenario(sim_path_info,      files_info)
+combined_mis_rand  <- res_for_scenario(sim_path_mis_rand,  files_mis_rand)
+combined_mis_shift <- res_for_scenario(sim_path_mis_shift, files_mis_shift)
 
-
+saveRDS(combined_neutral,   file.path(out_dir, "scenario_1cov_neutral_results.rds"))
+saveRDS(combined_info,      file.path(out_dir, "scenario_1cov_informative_results.rds"))
+saveRDS(combined_mis_rand,  file.path(out_dir, "scenario_1cov_mislead_random_results.rds"))
+saveRDS(combined_mis_shift, file.path(out_dir, "scenario_1cov_mislead_shifted_results.rds"))
