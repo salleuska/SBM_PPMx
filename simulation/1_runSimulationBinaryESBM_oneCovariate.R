@@ -54,7 +54,7 @@ z0 <- sim_obj$partition
 ## ------------------------------- ##
 ## Infer scenario 
 ## ------------------------------- ##
-f## Infer scenario from filename
+## Infer scenario from filename
 fname <- basename(data_path)
 
 if (grepl("1cov_neutral", fname, ignore.case = TRUE)) {
