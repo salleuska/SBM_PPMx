@@ -75,15 +75,15 @@ z0 <- sim_obj$partition
 ## ------------------------------- ##
 fname <- basename(data_path)
 
-if (grepl("none", fname, ignore.case = TRUE)) {
-  scenario <- "none"
+if (grepl("neutral", fname, ignore.case = TRUE)) {
+  scenario <- "neutral"
 } else if (grepl("one", fname, ignore.case = TRUE)) {
   scenario <- "one"
 } else if (grepl("both", fname, ignore.case = TRUE)) {
   scenario <- "both"
 } else {
   stop("Cannot infer scenario from file name: ", fname,
-       "\nExpected it to include 'none', 'one', or 'both'.")
+       "\nExpected it to include 'neutral', 'one', or 'both'.")
 }
 
 cat("Simulation scenario =", scenario, "\n\n")

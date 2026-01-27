@@ -101,7 +101,7 @@ plot_adj_matrix_gg <- function(sim_obj) {
   #------------------------------------------#
   ggplot(grid_idx, aes(x = col_f, y = row_f, fill = value)) +
     geom_tile() +
-    scale_fill_gradientn(colors = adj_pal, guide = "none") +
+    scale_fill_gradientn(colors = adj_pal, guide = "neutral") +
     coord_fixed() +
     theme_minimal(base_size = 12) +
     theme(
@@ -154,7 +154,7 @@ We consider a transportation--network setting in which each node is characterize
 
 ```{r}
 #| layout-ncol: 2
-sim_none  <- readRDS(here("simulation", "data", "binarySBM_none.rds"))
+sim_none  <- readRDS(here("simulation", "data", "binarySBM_neutral.rds"))
 sim_one  <- readRDS(here("simulation", "data", "binarySBM_one.rds"))
 sim_both  <- readRDS(here("simulation", "data", "binarySBM_both.rds"))
 
@@ -165,7 +165,7 @@ plot_network_geo(sim_one)
 plot_network_geo(sim_both)
 ```
 
-**Note**: for this first simualtion I used just scenario none and one and included only one covariate in the model
+**Note**: for this first simualtion I used just scenario neutral and one and included only one covariate in the model
 
 For the simulation study we run the ESBM gibbs with the following settings 
 

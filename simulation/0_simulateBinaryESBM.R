@@ -20,7 +20,7 @@ library(RColorBrewer)
 #       controlled by cov_dep:
 #         - "both": both covariates informative (cluster-specific means).
 #         - "one" : only first covariate informative.
-#         - "none": covariates independent of cluster structure.
+#         - "neutral": covariates independent of cluster structure.
 #
 # Returns:
 #       Y               adjacency matrix
@@ -67,7 +67,7 @@ simBinarySBM <- function(
 
 
 add_covariates_SBMsim <- function(base_obj, 
-  cov_dep = c("none", "one", "both")) {
+  cov_dep = c("neutral", "one", "both")) {
   cov_dep <- match.arg(cov_dep)
 
   Y <- base_obj$Y
@@ -109,7 +109,7 @@ add_covariates_SBMsim <- function(base_obj,
       )
     }
 
-  } else { # none
+  } else { # neutral
 
     x <- MASS::mvrnorm(n, mu = c(0,0), Sigma = diag(2))
   }
@@ -205,7 +205,7 @@ plot_adj_matrix_gg <- function(sim_obj) {
   #------------------------------------------#
   ggplot(grid_idx, aes(x = col_f, y = row_f, fill = value)) +
     geom_tile() +
-    scale_fill_gradientn(colors = adj_pal, guide = "none") +
+    scale_fill_gradientn(colors = adj_pal, guide = "neutral") +
     coord_fixed() +
     theme_minimal(base_size = 12) +
     theme(
@@ -229,7 +229,7 @@ set.seed(1116)
 base <- simBinarySBM(p_within = 0.4, p_between = 0.2)
 
 # Generate three covariate scenarios using same Y and same z
-sim_none  <- add_covariates_SBMsim(base, "none")
+sim_none  <- add_covariates_SBMsim(base, "neutral")
 sim_one   <- add_covariates_SBMsim(base, "one")
 sim_both  <- add_covariates_SBMsim(base, "both")
 
@@ -237,7 +237,7 @@ sim_both  <- add_covariates_SBMsim(base, "both")
 dir.create(here("simulation/data"), 
   recursive = TRUE, showWarnings = FALSE)
 
-saveRDS(sim_none, here("simulation/data/binarySBM_none.rds"))
+saveRDS(sim_none, here("simulation/data/binarySBM_neutral.rds"))
 saveRDS(sim_one, here("simulation/data/binarySBM_one.rds"))
 saveRDS(sim_both, here("simulation/data/binarySBM_both.rds"))
 
@@ -254,7 +254,7 @@ plot_network_geo(sim_both)
 #   clust_sizes = c(50, 40, 30, 30),        # cluster sizes
 #   p_within    = 0.8,                      # within-cluster edge prob
 #   p_between   = 0.1,                      # between-cluster edge prob
-#   cov_dep     = c("none", "one", "both")  # covariate–cluster dependence
+#   cov_dep     = c("neutral", "one", "both")  # covariate–cluster dependence
 # ) {
 #   cov_dep <- match.arg(cov_dep)
 
@@ -313,7 +313,7 @@ plot_network_geo(sim_both)
 #       )
 #     }
 
-#   } else {  # cov_dep == "none"
+#   } else {  # cov_dep == "neutral"
 
 #     mx <- c(0, 0)
 #     Sx <- diag(2)

@@ -30,14 +30,14 @@ extract_df <- function(obj, scen_name) {
 #############################################################################
 
 df <- rbind(
-  extract_df(res_none, "none"),
+  extract_df(res_none, "neutral"),
   extract_df(res_one,  "one")
 )
 
 ## remove alpha = 4 
 df <- df[df$alpha != 4, ]
 
-df$scenario <- factor(df$scenario, levels = c("none", "one"))
+df$scenario <- factor(df$scenario, levels = c("neutral", "one"))
 df <- df[order(df$alpha), ]
 
 ### Plot of average ari

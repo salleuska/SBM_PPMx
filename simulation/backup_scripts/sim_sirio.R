@@ -3,7 +3,7 @@ library(MASS)
 my_sim(
   ns=c(50,40,30,30),                  # cluster sizes (they imply n and K, see below)
   p_within=.8, p_between=.1,          # edge probabilities (default = clear assortativity) 
-  cov_dep=c("none","one","both")){    # 3 scenarios of covariates' dependence on clusters
+  cov_dep=c("neutral","one","both")){    # 3 scenarios of covariates' dependence on clusters
   
   cov_dep <- match.arg(cov_dep)
   n = sum(ns)                             # sample size
@@ -44,7 +44,7 @@ my_sim(
     mx2 = 0
     sx2 = 1
     for (i in 1:n) x[i,] = c(rnorm(1,mx1[z[i]],sx1), rnorm(1,mx2,sx2)) 
-  } else { # that is, if cov_dep="none"
+  } else { # that is, if cov_dep="neutral"
     mx = c(0,0)
     Sx = diag(2)
     x = mvrnorm(n,mx,Sx) 

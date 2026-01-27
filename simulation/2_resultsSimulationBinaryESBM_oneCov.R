@@ -17,7 +17,7 @@ library(cluster)    # to compute silhouette
 
 ## Paths to results directory and simulation files
 results_dir <- here("simulation", "results", "oneCov")
-sim_path_none <- here("simulation", "data", "binarySBM_none.rds")
+sim_path_none <- here("simulation", "data", "binarySBM_neutral.rds")
 sim_path_one <- here("simulation", "data", "binarySBM_one.rds")
 # sim_path_both <- here("simulation", "data", "binarySBM_both.rds")
 

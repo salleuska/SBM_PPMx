@@ -52,16 +52,16 @@ x  <- sim_obj$x              # matrix n x 1 or n x 2 but we use only first
 z0 <- sim_obj$partition
 
 ## ------------------------------- ##
-## Infer scenario (none / one)
+## Infer scenario (neutral / one)
 ## ------------------------------- ##
 fname <- basename(data_path)
 
-if (grepl("none", fname, ignore.case = TRUE)) {
-  scenario <- "none"
+if (grepl("neutral", fname, ignore.case = TRUE)) {
+  scenario <- "neutral"
 } else if (grepl("one", fname, ignore.case = TRUE)) {
   scenario <- "one"
 } else {
-  stop("Filename must contain 'none' or 'one'. Found: ", fname)
+  stop("Filename must contain 'neutral' or 'one'. Found: ", fname)
 }
 
 cat("Scenario:", scenario, "\n\n")
