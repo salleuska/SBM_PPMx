@@ -5,13 +5,15 @@ suppressPackageStartupMessages({
   library(igraph)
   library(tools)
 })
-## -------------------------------
+## ------------------------------- ##
 ## Parse command-line args
-##   file=path/to/file.rds
-##   alpha=1
-##   seed=123
-##   N_iter=10000
-## -------------------------------
+## example
+args <- list()
+args$data_path= "simulation/data/binarySBM_one.rds"
+args$alpha1=1
+args$alpha2=2
+args$seed=13
+## ------------------------------- ##
 args <- R.utils::commandArgs(asValue = TRUE)
 
 # data_path  (REQUIRED)
@@ -42,16 +44,16 @@ if (is.null(args$N_iter)) {
   N_iter <- as.integer(args$N_iter)
 }
 
-## -------------------------------
+## ------------------------------- ##
 ## Source ESBM code
-## -------------------------------
+## ------------------------------- ##
 source(here("R_utilties", "esbm.R"))
 source(here("R_utilties", "similarity_functions.R"))
 Rcpp::sourceCpp(here("R_utilties", "stirling.cpp"))
 
-## -------------------------------
+## ------------------------------- ##
 ## Hyperparameters
-## -------------------------------
+## ------------------------------- ##
 a       <- 1
 b       <- 1
 beta_dm <- 1
@@ -59,18 +61,18 @@ H_dm    <- 4
 
 set.seed(seed)
 
-## -------------------------------
+## ------------------------------- ##
 ## Load the simulated object
-## -------------------------------
+## ------------------------------- ##
 sim_obj <- readRDS(data_path)
 
 Y  <- sim_obj$Y
 x  <- sim_obj$x
 z0 <- sim_obj$partition
 
-## -------------------------------
+## ------------------------------- ##
 ## Infer scenario from file name
-## -------------------------------
+## ------------------------------- ##
 fname <- basename(data_path)
 
 if (grepl("none", fname, ignore.case = TRUE)) {
@@ -86,9 +88,9 @@ if (grepl("none", fname, ignore.case = TRUE)) {
 
 cat("Simulation scenario =", scenario, "\n\n")
 
-## -------------------------------
+## ------------------------------- ##
 ## Prepare x, similarity_fun, sim_args, alpha
-## -------------------------------
+## ------------------------------- ##
 
 ## define data frame with two covariates
 x_df <- data.frame(
@@ -111,9 +113,9 @@ sim_args <- list(
 # always provide two alphas
 alpha_g_vec <- c(alpha1_in, alpha2_in)
 
-## -------------------------------
+## ------------------------------- ##
 ## Run ESBM
-## -------------------------------
+## ------------------------------- ##
 cat("Starting ESBM sampler...\n")
 
 Z_post <- esbm(
@@ -134,9 +136,9 @@ Z_post <- esbm(
 
 cat("Sampler finished.\n\n")
 
-## -------------------------------
+## ------------------------------- ##
 ## Save results
-## -------------------------------
+## ------------------------------- ##
 out_dir <- here("simulation", "results", "twoCov")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
