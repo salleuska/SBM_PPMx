@@ -7,8 +7,12 @@ library(mclust)
 library(salso)
 library(cluster)
 library(tools)
-################################
 library(here)
+################################
+## set directory for output
+outDir <- here("simulation", "results", "processed", "oneCov")
+dir.create(outDir, recursive = TRUE, showWarnings = FALSE)
+################################
 
 ## read processed results (1-cov)
 res_neutral <- readRDS(
@@ -85,7 +89,13 @@ p_ari_mean <- ggplot(df, aes(x = alpha, y = ARI_mean, color = scenario)) +
     legend.position = "right"
   )
 
-ggsave("average_ARI_withSD_1cov.pdf", p_ari_mean, width = 7, height = 4)
+ggsave(
+  filename = file.path(outDir, "average_ARI_withSD_1cov.pdf"),
+  plot     = p_ari_mean,
+  width    = 7,
+  height   = 4
+)
+
 
 ### ARI of VI representative clustering
 p_ari_vi <- ggplot(df, aes(x = alpha, y = ARI_vi, color = scenario)) +
@@ -105,7 +115,7 @@ p_ari_vi <- ggplot(df, aes(x = alpha, y = ARI_vi, color = scenario)) +
     legend.position = "right"
   )
 
-ggsave("ARI_trueVsEstimated_1cov.pdf", p_ari_vi, width = 7, height = 4)
+ggsave(file.path(outDir, "ARI_trueVsEstimated_1cov.pdf"), p_ari_vi, width = 7, height = 4)
 
 ### Silhouette
 p_sil <- ggplot(df, aes(x = alpha, y = silhouette, color = scenario)) +
@@ -124,7 +134,7 @@ p_sil <- ggplot(df, aes(x = alpha, y = silhouette, color = scenario)) +
     legend.position = "right"
   )
 
-ggsave("silhouette_1cov.pdf", p_sil, width = 7, height = 4)
+ggsave(file.path(outDir, "silhouette_1cov.pdf"),         p_sil,    width = 7, height = 4)
 
 #############################################################################
 ## Details: PSM + estimated partition + true partition
@@ -199,7 +209,8 @@ p0 <- cowplot::ggdraw() +
   cowplot::draw_label("Neutral covariate (alpha = 0)",
                       fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
   cowplot::draw_plot(p0[[4]], x = 0, y = 0, width = 1, height = 0.92)
-ggsave("psm_neutral_alpha0.pdf", p0, width = 6, height = 6)
+
+ggsave(file.path(outDir, "psm_neutral_alpha0.pdf"), p0, width = 6, height = 6)
 
 alpha05 <- res_info$results$alpha_0.50
 p05 <- plot_psm_with_annotations(
@@ -211,7 +222,8 @@ p05 <- cowplot::ggdraw() +
   cowplot::draw_label("Informative covariate (alpha = 0.5)",
                       fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
   cowplot::draw_plot(p05[[4]], x = 0, y = 0, width = 1, height = 0.92)
-ggsave("psm_informative_alpha05.pdf", p05, width = 6, height = 6)
+
+ggsave(file.path(outDir, "psm_neutral_alpha05.pdf"), p05, width = 6, height = 6)
 
 alpha1 <- res_info$results$alpha_1.00
 p1 <- plot_psm_with_annotations(
@@ -219,11 +231,14 @@ p1 <- plot_psm_with_annotations(
   z_true = res_info$sim$partition_true,
   z_est  = simple_relabel(alpha1$z_hat, z_true = res_info$sim$partition_true)
 )
+
 p1 <- cowplot::ggdraw() +
   cowplot::draw_label("Informative covariate (alpha = 1)",
                       fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
   cowplot::draw_plot(p1[[4]], x = 0, y = 0, width = 1, height = 0.92)
-ggsave("psm_informative_alpha1.pdf", p1, width = 6, height = 6)
+
+ggsave(file.path(outDir, "psm_informative_alpha1.pdf"), p1, width = 6, height = 6)
+
 
 alpha2 <- res_info$results$alpha_2.00
 p2 <- plot_psm_with_annotations(
@@ -231,8 +246,11 @@ p2 <- plot_psm_with_annotations(
   z_true = res_info$sim$partition_true,
   z_est  = simple_relabel(alpha2$z_hat, z_true = res_info$sim$partition_true)
 )
+
+
 p2 <- cowplot::ggdraw() +
   cowplot::draw_label("Informative covariate (alpha = 2)",
                       fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
   cowplot::draw_plot(p2[[4]], x = 0, y = 0, width = 1, height = 0.92)
-ggsave("psm_informative_alpha2.pdf", p2, width = 6, height = 6)
+
+ggsave(file.path(outDir, "psm_informative_alpha2.pdf"), p2, width = 6, height = 6)
