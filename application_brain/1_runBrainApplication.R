@@ -140,7 +140,7 @@ cat("Done.\n\n")
 ## ------------------------------- ##
 ## Save output
 ## ------------------------------- ##
-out_dir <- here("application_brain", "results", "xyzCov")
+out_dir <- here("application_brain", "results")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 alpha_tag <- paste0(
