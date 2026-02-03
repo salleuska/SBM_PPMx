@@ -14,23 +14,21 @@ if (is.null(args$data_path)) {
   data_path <- args$data_path
 }
 
-seed   <- if (is.null(args$seed)) 123 else as.integer(args$seed)
+seed   <- if (is.null(args$seed)) 123 else as.integer(args$seed) + 1000
 N_iter <- if (is.null(args$N_iter)) 10000 else as.integer(args$N_iter)
 
 alpha_x <- if (is.null(args$alpha_x)) 1 else as.numeric(args$alpha_x)
 alpha_y <- if (is.null(args$alpha_y)) 1 else as.numeric(args$alpha_y)
 alpha_z <- if (is.null(args$alpha_z)) 1 else as.numeric(args$alpha_z)
 
-cat("  alpha_x =", alpha_x, "\n")
-cat("  alpha_y =", alpha_y, "\n")
-cat("  alpha_z =", alpha_z, "\n\n")
-
 # Always drop isolated nodes
 drop_isolates <- TRUE
 
 cat("Running ESBM (brain application) with:\n")
 cat("  file          =", data_path, "\n")
-cat("  alpha         =", paste(alpha_vec, collapse = ", "), "\n")
+cat("  alpha_x =", alpha_x, "\n")
+cat("  alpha_y =", alpha_y, "\n")
+cat("  alpha_z =", alpha_z, "\n\n")
 cat("  seed          =", seed, "\n")
 cat("  N_iter        =", N_iter, "\n")
 cat("  covariates    = x, y, z (all)\n")
@@ -114,7 +112,7 @@ sim_args <- list(
 )
 
 #  provide three alphas
-alpha_g_vec <- c(alpha_x, alpha_y, alpha_z)
+alpha_vec <- c(alpha_x, alpha_y, alpha_z)
 ## ------------------------------- ##
 ## Run ESBM
 ## ------------------------------- ##
@@ -129,7 +127,7 @@ Z_post <- esbm(
   a              = a,
   b              = b,
   gamma_GN       = gamma_GN,
-  x              = X_std,
+  x              = x_df,
   similarity_fun = similarity_fun,
   sim_args       = sim_args,
   alpha_g        = alpha_vec
