@@ -11,8 +11,6 @@ library(tools)
 library(ggplot2)
 library(gridExtra)   # for arranging plots
 
-
-
 # ---------------------------
 # 1) Drop isolated nodes
 # ---------------------------
