@@ -9,7 +9,7 @@ library(here)
 library(igraph)
 library(tools)
 library(ggplot2)
-library(gridExtra)   # for arranging plots
+library(cowplot)   # for arranging plots
 
 # ---------------------------
 # 1) Drop isolated nodes
@@ -30,6 +30,7 @@ coords_kept$degree <- deg[keep]
 # ---------------------------
 # 2) Edge list (upper triangle)
 # ---------------------------
+
 edges <- which(A == 1, arr.ind = TRUE)
 edges <- edges[edges[, 1] < edges[, 2], , drop = FALSE]
 
@@ -41,6 +42,7 @@ edges_df <- data.frame(
   y2 = coords_kept$y[edges[, 2]],
   z2 = coords_kept$z[edges[, 2]]
 )
+
 
 # ---------------------------
 # 3) Helper to make a view plot
@@ -103,18 +105,23 @@ p_xz <- make_view_plot(coords_kept, edges_df, view = "xz")
 p_yz <- make_view_plot(coords_kept, edges_df, view = "yz")
 
 # Display as 1 row of 3
-gridExtra::grid.arrange(p_xy, p_xz, p_yz, ncol = 3)
+p_all <- cowplot::plot_grid(p_xy, p_xz, p_yz, nrow = 1)
 
 # ---------------------------
 # 5) Optional: save to file
 # ---------------------------
-# ggsave("brain_network_3views.png",
-#        gridExtra::arrangeGrob(p_xy, p_xz, p_yz, ncol = 3),
-#        width = 12, height = 4, dpi = 300)
+# Create figures directory if needed
 
-# ---------------------------
-# 6) Objects you may want next
-# ---------------------------
-# A           : adjacency after dropping isolates
-# coords_kept : coords aligned + degree column
-# edges_df    : edge list with endpoints in x/y/z
+fig_dir <- here("application_brain", "figures")
+if (!dir.exists(fig_dir)) {
+  dir.create(fig_dir, recursive = TRUE)
+}
+
+# Save the 3-view plot
+ggsave(
+  filename = here("application_brain", "figures", "brain_network_3views.png"),
+  plot = gridExtra::arrangeGrob(p_xy, p_xz, p_yz, ncol = 3),
+  width = 12,
+  height = 4,
+  dpi = 300
+)
