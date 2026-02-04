@@ -10,8 +10,7 @@ library(tools)
 library(here)
 ################################
 ## set directory for output
-outDir <- here("simulation", "results", "processed", "oneCov")
-dir.create(outDir, recursive = TRUE, showWarnings = FALSE)
+outDir <- here()
 ################################
 
 ## read processed results (1-cov)

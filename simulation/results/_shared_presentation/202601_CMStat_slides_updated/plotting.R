@@ -37,7 +37,7 @@ df <- rbind(
 ## remove alpha = 4 
 df <- df[df$alpha != 4, ]
 
-df$scenario <- factor(df$scenario, levels = c("neutral", "one"))
+df$scenario <- factor(df$scenario, levels = c("neutral", "one"), labels = c("neutral", "informative"))
 df <- df[order(df$alpha), ]
 
 ### Plot of average ari
