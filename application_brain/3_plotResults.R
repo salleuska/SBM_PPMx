@@ -3,6 +3,63 @@ library(ggplot2)
 library(RColorBrewer)
 library(cowplot)
 
+plot_matrix_with_clusters <- function(M, z_est,
+                                      type = c("psm", "adj"),
+                                      title = NULL) {
+
+  type <- match.arg(type)
+
+  require(pheatmap)
+  require(RColorBrewer)
+
+  n <- nrow(M)
+  rn <- paste0("i", seq_len(n))
+  rownames(M) <- rn
+  colnames(M) <- rn
+
+  ann <- data.frame(cluster = factor(z_est))
+  rownames(ann) <- rn
+
+  okabe_ito <- c(
+    "#E69F00", "#56B4E9", "#009E73",
+    "#D55E00", "#CC79A7", "#0072B2",
+    "#F0E442", "#999999"
+  )
+  lev  <- levels(ann$cluster)
+  cols <- okabe_ito[seq_len(length(lev))]
+  names(cols) <- lev
+
+  ord <- order(z_est)
+  M_ord   <- M[ord, ord, drop = FALSE]
+  ann_ord <- ann[ord, , drop = FALSE]
+  gaps <- which(diff(as.integer(ann_ord$cluster)) != 0)
+
+  if (type == "psm") {
+    mat_cols <- colorRampPalette(brewer.pal(9, "Greys"))(80)
+    breaks   <- NULL
+  } else {
+    mat_cols <- c("white", "black")
+    breaks   <- c(-0.5, 0.5, 1.5)
+  }
+
+  pheatmap(
+    M_ord,
+    color             = mat_cols,
+    breaks            = breaks,
+    cluster_rows      = FALSE,
+    cluster_cols      = FALSE,
+    show_rownames     = FALSE,
+    show_colnames     = FALSE,
+    annotation_row    = ann_ord,
+    annotation_col    = ann_ord,
+    annotation_colors = list(cluster = cols),
+    gaps_row          = gaps,
+    gaps_col          = gaps,
+    border_color      = NA,
+    main              = title
+  )
+}
+
 ##--------------------------------------------
 ## Read processed application results (3-cov)
 ##--------------------------------------------
@@ -149,7 +206,9 @@ save_best_plots <- function(best_row, criterion_label) {
   psm_mat <- best_res$psm
   z_hat   <- as.integer(best_res$z_hat)
 
-  ## PSM heatmap (ordered by z_hat)
+  ## -------------------------------
+  ## 1) PSM heatmap (ggplot)
+  ## -------------------------------
   ord <- order(z_hat)
   psm_ord <- psm_mat[ord, ord, drop = FALSE]
 
@@ -177,7 +236,9 @@ save_best_plots <- function(best_row, criterion_label) {
     p_psm, width = 8, height = 7, dpi = 300
   )
 
-  ## 3-view clusters
+  ## -------------------------------
+  ## 2) 3-view spatial plots
+  ## -------------------------------
   nodes_df <- coords_kept
   nodes_df$cluster <- factor(z_hat)
 
@@ -194,6 +255,28 @@ save_best_plots <- function(best_row, criterion_label) {
     height   = 4,
     dpi      = 300
   )
+
+  ## -------------------------------
+  ## 3) Matrix plots (PSM + adjacency)
+  ## -------------------------------
+  # adjacency matrix A must already be loaded & isolate-filtered
+  pdf(file.path(outDir, sprintf("best_%s_psm_matrix.pdf", criterion_label)),
+      width = 7, height = 7)
+  plot_matrix_with_clusters(
+    psm_mat, z_hat,
+    type  = "psm",
+    title = sprintf("PSM — best by %s silhouette", criterion_label)
+  )
+  dev.off()
+
+  pdf(file.path(outDir, sprintf("best_%s_adj_matrix.pdf", criterion_label)),
+      width = 7, height = 7)
+  plot_matrix_with_clusters(
+    A_bin_tau[keep, keep] , z_hat,
+    type  = "adj",
+    title = sprintf("Adjacency — best by %s silhouette", criterion_label)
+  )
+  dev.off()
 
   invisible(NULL)
 }
