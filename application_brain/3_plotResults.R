@@ -2,6 +2,7 @@ library(here)
 library(ggplot2)
 library(RColorBrewer)
 library(cowplot)
+library(Polychrome)
 
 plot_matrix_with_clusters <- function(M, z_est,
                                       type = c("psm", "adj"),
@@ -20,13 +21,8 @@ plot_matrix_with_clusters <- function(M, z_est,
   ann <- data.frame(cluster = factor(z_est))
   rownames(ann) <- rn
 
-  okabe_ito <- c(
-    "#E69F00", "#56B4E9", "#009E73",
-    "#D55E00", "#CC79A7", "#0072B2",
-    "#F0E442", "#999999"
-  )
   lev  <- levels(ann$cluster)
-  cols <- okabe_ito[seq_len(length(lev))]
+  cols <- palette36.colors(length(lev))
   names(cols) <- lev
 
   ord <- order(z_est)
