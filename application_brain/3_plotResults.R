@@ -39,17 +39,27 @@ green_pal  <- colorRampPalette(brewer.pal(9, "Greens"))(50)
 purple_pal <- colorRampPalette(brewer.pal(9, "Purples"))(50)
 
 ##--------------------------------------------
-## Pick the best alpha by posterior silhouette
+## Pick best alpha by each criterion
 ##--------------------------------------------
-if (all(is.na(df3$sil_post))) stop("All sil_post are NA; cannot pick best alpha.")
-best_i <- which.max(df3$sil_post)
-best   <- df3[best_i, ]
+pick_best <- function(df, col) {
+  if (all(is.na(df[[col]]))) stop("All ", col, " are NA; cannot pick best alpha.")
+  df[which.max(df[[col]]), ]
+}
 
-cat("\nBest alpha (by posterior silhouette sil_post):\n")
-print(best[, c("alpha_x","alpha_y","alpha_z","K_hat","sil_post","sil_net","sil_cov")])
+best_post <- pick_best(df3, "sil_post")
+best_net  <- pick_best(df3, "sil_net")
+best_cov  <- pick_best(df3, "sil_cov")
 
-# save a small summary table
-write.csv(best, file.path(outDir, "best_alpha_by_sil_post.csv"), row.names = FALSE)
+best_all <- rbind(
+  data.frame(criterion = "post", best_post, row.names = NULL),
+  data.frame(criterion = "net",  best_net,  row.names = NULL),
+  data.frame(criterion = "cov",  best_cov,  row.names = NULL)
+)
+
+write.csv(best_all, file.path(outDir, "best_alpha_by_each_silhouette.csv"), row.names = FALSE)
+
+cat("\nBest alpha by silhouette criterion:\n")
+print(best_all[, c("criterion","alpha_x","alpha_y","alpha_z","K_hat","sil_post","sil_net","sil_cov")])
 
 ##--------------------------------------------
 ## Heatmap helper
@@ -79,75 +89,37 @@ make_heatmap <- function(df, fill_var, title, fill_lab, pal) {
 ##--------------------------------------------
 p_post <- make_heatmap(
   df3, "sil_post",
-  "Posterior silhouette (D = 1 - PSM) over (alpha_x, alpha_y), faceted by alpha_z",
+  "Posterior silhouette (D = 1 - PSM) \nover (alpha_x, alpha_y) \nfaceted by alpha_z",
   "Silhouette", blue_pal
 )
 ggsave(file.path(outDir, "silhouette_post_heatmap_xyz.pdf"), p_post, width = 9, height = 6)
 
 p_net <- make_heatmap(
   df3, "sil_net",
-  "Network silhouette (adjacency-profile distance) over (alpha_x, alpha_y), faceted by alpha_z",
+  "Network silhouette (adjacency-profile distance) \nover (alpha_x, alpha_y) \nfaceted by alpha_z",
   "Silhouette", green_pal
 )
 ggsave(file.path(outDir, "silhouette_net_heatmap_xyz.pdf"), p_net, width = 9, height = 6)
 
 p_cov <- make_heatmap(
   df3, "sil_cov",
-  "Covariate silhouette (Euclidean on standardized xyz) over (alpha_x, alpha_y), faceted by alpha_z",
+  "Covariate silhouette (Euclidean on standardized xyz) \nover (alpha_x, alpha_y) \nfaceted by alpha_z",
   "Silhouette", purple_pal
 )
 ggsave(file.path(outDir, "silhouette_cov_heatmap_xyz.pdf"), p_cov, width = 9, height = 6)
 
 ##--------------------------------------------
-## Posterior plots for BEST alpha: PSM heatmap + 3-view cluster map
+## Load data for coordinates (same isolate-drop as model run)
 ##--------------------------------------------
-
-best_tag <- best$tag
-best_res <- res_app$results[[best_tag]]
-
-psm_mat <- best_res$psm
-z_hat   <- as.integer(best_res$z_hat)
-
-# order nodes by z_hat, then within cluster by average PSM similarity
-ord <- order(z_hat)
-
-psm_ord <- psm_mat[ord, ord, drop = FALSE]
-z_ord   <- z_hat[ord]
-
-# build long df for ggplot heatmap
-psm_df <- data.frame(
-  i = rep(seq_len(nrow(psm_ord)), times = ncol(psm_ord)),
-  j = rep(seq_len(ncol(psm_ord)), each  = nrow(psm_ord)),
-  p = as.vector(psm_ord)
-)
-
-p_psm <- ggplot(psm_df, aes(x = j, y = i, fill = p)) +
-  geom_raster() +
-  scale_fill_gradientn(colors = blue_pal, limits = c(0, 1)) +
-  coord_equal() +
-  theme_minimal(base_size = 12) +
-  labs(
-    title = sprintf("PSM (ordered by VI partition) — best alpha: (%.2f, %.2f, %.2f)",
-                    best$alpha_x, best$alpha_y, best$alpha_z),
-    x = "Node index (ordered)", y = "Node index (ordered)", fill = "PSM"
-  ) +
-  theme(plot.title = element_text(face = "bold"))
-
-ggsave(file.path(outDir, "best_alpha_psm_heatmap.pdf"), p_psm, width = 7, height = 6)
-
-##--------------------------------------------
-## 3-view plot colored by z_hat (best alpha)
-##--------------------------------------------
-# Load original data to get coordinates and apply the same isolate-drop as the model run
 load(here("application_brain", "consensus_scale33_tau50.RData"))
-
 diag(A_bin_tau) <- 0
 deg  <- rowSums(A_bin_tau)
 keep <- deg > 0
-
 coords_kept <- coords[keep, , drop = FALSE]
-coords_kept$cluster <- factor(z_hat)  # z_hat already corresponds to kept nodes
 
+##--------------------------------------------
+## Plot helper: make PSM heatmap + 3-view cluster map for a chosen "best"
+##--------------------------------------------
 make_view_nodes <- function(nodes_df, view = c("xy", "xz", "yz"),
                             node_alpha = 0.95, node_size = 2.0) {
   view <- match.arg(view)
@@ -169,22 +141,72 @@ make_view_nodes <- function(nodes_df, view = c("xy", "xz", "yz"),
           panel.grid.minor = element_blank())
 }
 
-p_xy <- make_view_nodes(coords_kept, "xy")
-p_xz <- make_view_nodes(coords_kept, "xz")
-p_yz <- make_view_nodes(coords_kept, "yz")
+save_best_plots <- function(best_row, criterion_label) {
 
-p_views <- cowplot::plot_grid(p_xy, p_xz, p_yz, nrow = 1)
+  best_tag <- best_row$tag
+  best_res <- res_app$results[[best_tag]]
 
-ggsave(
-  filename = file.path(outDir, "best_alpha_clusters_3views.pdf"),
-  plot     = p_views,
-  width    = 12,
-  height   = 4,
-  dpi      = 300
-)
+  psm_mat <- best_res$psm
+  z_hat   <- as.integer(best_res$z_hat)
+
+  ## PSM heatmap (ordered by z_hat)
+  ord <- order(z_hat)
+  psm_ord <- psm_mat[ord, ord, drop = FALSE]
+
+  psm_df <- data.frame(
+    i = rep(seq_len(nrow(psm_ord)), times = ncol(psm_ord)),
+    j = rep(seq_len(ncol(psm_ord)), each  = nrow(psm_ord)),
+    p = as.vector(psm_ord)
+  )
+
+  title_psm <- sprintf(
+    "PSM (ordered by VI partition) — best by %s silhouette: (%.2f, %.2f, %.2f)",
+    criterion_label, best_row$alpha_x, best_row$alpha_y, best_row$alpha_z
+  )
+
+  p_psm <- ggplot(psm_df, aes(x = j, y = i, fill = p)) +
+    geom_tile() +
+    scale_fill_gradientn(colors = blue_pal, limits = c(0, 1)) +
+    coord_equal() +
+    theme_minimal(base_size = 12) +
+    labs(title = title_psm, x = "Node index (ordered)", y = "Node index (ordered)", fill = "PSM") +
+    theme(plot.title = element_text(face = "bold"))
+
+  ggsave(
+    file.path(outDir, sprintf("best_%s_psm_heatmap.pdf", criterion_label)),
+    p_psm, width = 8, height = 7, dpi = 300
+  )
+
+  ## 3-view clusters
+  nodes_df <- coords_kept
+  nodes_df$cluster <- factor(z_hat)
+
+  p_xy <- make_view_nodes(nodes_df, "xy")
+  p_xz <- make_view_nodes(nodes_df, "xz")
+  p_yz <- make_view_nodes(nodes_df, "yz")
+
+  p_views <- cowplot::plot_grid(p_xy, p_xz, p_yz, nrow = 1)
+
+  ggsave(
+    filename = file.path(outDir, sprintf("best_%s_clusters_3views.pdf", criterion_label)),
+    plot     = p_views,
+    width    = 12,
+    height   = 4,
+    dpi      = 300
+  )
+
+  invisible(NULL)
+}
+
+##--------------------------------------------
+## Produce posterior plots for all three "best" criteria
+##--------------------------------------------
+save_best_plots(best_post, "post")
+save_best_plots(best_net,  "net")
+save_best_plots(best_cov,  "cov")
 
 cat("\nSaved:\n",
     " - silhouette heatmaps (post/net/cov)\n",
-    " - best_alpha_psm_heatmap.pdf\n",
-    " - best_alpha_clusters_3views.pdf\n",
+    " - best_post/net/cov_psm_heatmap.pdf\n",
+    " - best_post/net/cov_clusters_3views.pdf\n",
     "in:\n  ", outDir, "\n")
