@@ -209,6 +209,93 @@ p_alpha0 <- cowplot::ggdraw() +
   cowplot::draw_plot(p_alpha0[[4]], x = 0, y = 0, width = 1, height = 0.92)
 
 
+ggsave("psm_noninformtive_alpha0.pdf", p_alpha0,
+       width = 6, height = 6)
+##########
+
+### Scenario with effect of one covariate
+alpha05 <- res_none$results$alpha_0.50
+
+## no relabeling
+# p_alpha05 <- plot_psm_noninformtive_with_annotations(
+#   psm    = alpha05$psm,
+#   z_true = res_none$sim$partition_true,
+#   z_est  = alpha05$z_hat
+# )
+
+p_alpha05 <- plot_psm_with_annotations(
+  psm    = alpha05$psm,
+  z_true = res_none$sim$partition_true,
+  z_est  = simple_relabel(alpha05$z_hat, z_true = res_none$sim$partition_true)
+)
+
+p_alpha05 <- cowplot::ggdraw() +
+  cowplot::draw_label("Covariate effect (alpha = 0.5)",
+                      fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
+  cowplot::draw_plot(p_alpha05[[4]], x = 0, y = 0, width = 1, height = 0.92)
+
+
+ggsave("psm_noninformtive_alpha05.pdf", p_alpha05,
+       width = 6, height = 6)
+##########
+alpha1 <- res_none$results$alpha_1.00
+
+## no relabeling
+# p_alpha1 <- plot_psm_with_annotations(
+#   psm    = alpha1$psm,
+#   z_true = res_none$sim$partition_true,
+#   z_est  = alpha1$z_hat
+# )
+
+p_alpha1 <- plot_psm_with_annotations(
+  psm    = alpha1$psm,
+  z_true = res_none$sim$partition_true,
+  z_est  = simple_relabel(alpha1$z_hat, z_true = res_none$sim$partition_true)
+)
+
+p_alpha1 <- cowplot::ggdraw() +
+  cowplot::draw_label("Covariate effect (alpha = 1)",
+                      fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
+  cowplot::draw_plot(p_alpha1[[4]], x = 0, y = 0, width = 1, height = 0.92)
+
+
+ggsave("psm_noninformtive_alpha1.pdf", p_alpha1,
+       width = 6, height = 6)
+##########
+alpha2 <- res_none$results$alpha_2.00
+
+p_alpha2 <- plot_psm_with_annotations(
+  psm    = alpha2$psm,
+  z_true = res_none$sim$partition_true,
+  z_est  = alpha2$z_hat
+)
+
+p_alpha2 <- cowplot::ggdraw() +
+  cowplot::draw_label("Covariate effect (alpha = 2)",
+                      fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
+  cowplot::draw_plot(p_alpha2[[4]], x = 0, y = 0, width = 1, height = 0.92)
+
+
+ggsave("psm_noninformtive_alpha2.pdf", p_alpha2,
+       width = 6, height = 6)
+
+
+########################################
+## scenario with neutral
+alpha0 <- res_one$results$alpha_0.00
+
+p_alpha0 <- plot_psm_with_annotations(
+  psm    = alpha0$psm,
+  z_true = res_one$sim$partition_true,
+  z_est  = alpha0$z_hat)
+
+
+p_alpha0 <- cowplot::ggdraw() +
+  cowplot::draw_label("No covariate effect (alpha = 0)",
+                      fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
+  cowplot::draw_plot(p_alpha0[[4]], x = 0, y = 0, width = 1, height = 0.92)
+
+
 ggsave("psm_alpha0.pdf", p_alpha0,
        width = 6, height = 6)
 ##########
