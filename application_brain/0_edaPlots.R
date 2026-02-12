@@ -156,12 +156,15 @@ ann_colors <- list(
     Right = "#D55E00"
   )
 )
-plot_psm_with_annotations(
-  psm         = A_ord,
-  ann_df      = ann_df,
-  show_cols   = "hemisphere",
-  ann_colors  = ann_colors,
-  gaps_by     = hemi_ord,
-  mat_palette = "Greys",
-  filename    = here("application_brain", "figures", "adjacency_matrix_hemi.pdf")
+
+
+plot_matrix_with_annotations(
+  M        = A_ord,
+  type     = "adj",
+  ann_df   = ann_df, 
+  show_cols = "hemisphere",
+  ann_colors = list(hemisphere = c(Left="#0072B2", Right="#D55E00", Other="#999999")),
+  gaps_by  = hemi_ord,
+  filename = here("application_brain", "figures", "adjacency_left_right_order.pdf")
 )
+
