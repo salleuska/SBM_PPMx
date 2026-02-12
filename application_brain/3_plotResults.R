@@ -1,192 +1,199 @@
-library(here)
-library(ggplot2)
-library(RColorBrewer)
-library(cowplot)
-library(Polychrome)
+#!/usr/bin/env Rscript
 
-plot_matrix_with_clusters <- function(M, z_est,
-                                      type = c("psm", "adj"),
-                                      title = NULL) {
+suppressPackageStartupMessages({
+  library(here)
+  library(R.utils)
+  library(ggplot2)
+  library(cowplot)
+})
 
-  type <- match.arg(type)
+args <- R.utils::commandArgs(asValue = TRUE)
 
-  require(pheatmap)
-  require(RColorBrewer)
+## ---------------------------
+## Parse args
+## ---------------------------
+alpha_x <- if (is.null(args$alpha_x)) stop("Provide alpha_x=") else as.numeric(args$alpha_x)
+alpha_y <- if (is.null(args$alpha_y)) stop("Provide alpha_y=") else as.numeric(args$alpha_y)
+alpha_z <- if (is.null(args$alpha_z)) stop("Provide alpha_z=") else as.numeric(args$alpha_z)
 
-  n <- nrow(M)
-  rn <- paste0("i", seq_len(n))
-  rownames(M) <- rn
-  colnames(M) <- rn
+label <- if (is.null(args$label)) "run" else as.character(args$label)
+edges_flag <- if (is.null(args$show_edges)) FALSE else as.logical(as.integer(args$show_edges))
 
-  ann <- data.frame(cluster = factor(z_est))
-  rownames(ann) <- rn
-
-  lev  <- levels(ann$cluster)
-  cols <- palette36.colors(length(lev))
-  names(cols) <- lev
-
-  ord <- order(z_est)
-  M_ord   <- M[ord, ord, drop = FALSE]
-  ann_ord <- ann[ord, , drop = FALSE]
-  gaps <- which(diff(as.integer(ann_ord$cluster)) != 0)
-
-  if (type == "psm") {
-    mat_cols <- colorRampPalette(brewer.pal(9, "Greys"))(80)
-    breaks   <- NULL
-  } else {
-    mat_cols <- c("white", "black")
-    breaks   <- c(-0.5, 0.5, 1.5)
-  }
-
-  pheatmap(
-    M_ord,
-    color             = mat_cols,
-    breaks            = breaks,
-    cluster_rows      = FALSE,
-    cluster_cols      = FALSE,
-    show_rownames     = FALSE,
-    show_colnames     = FALSE,
-    annotation_row    = ann_ord,
-    annotation_col    = ann_ord,
-    annotation_colors = list(cluster = cols),
-    gaps_row          = gaps,
-    gaps_col          = gaps,
-    border_color      = NA,
-    main              = title
-  )
-}
-
-##--------------------------------------------
-## Read processed application results (3-cov)
-##--------------------------------------------
+## ---------------------------
+## Paths
+## ---------------------------
+data_path <- here("application_brain", "consensus_scale33_tau50.RData")
 proc_path <- here("application_brain", "results", "processed",
                   "brain_xyz_processed_results.rds")
-res_app <- readRDS(proc_path)
 
-outDir <- here("application_brain", "figures")
+outDir <- here("application_brain", "figures", "posterior_parametric",
+               sprintf("%s_ax%0.2f_ay%0.2f_az%0.2f", label, alpha_x, alpha_y, alpha_z))
 dir.create(outDir, recursive = TRUE, showWarnings = FALSE)
 
-##--------------------------------------------
-## Extract df: one row per alpha triple
-##--------------------------------------------
-df3 <- data.frame(
-  tag      = names(res_app$results),
-  alpha_x  = sapply(res_app$results, function(r) r$alpha[1]),
-  alpha_y  = sapply(res_app$results, function(r) r$alpha[2]),
-  alpha_z  = sapply(res_app$results, function(r) r$alpha[3]),
-  K_hat    = sapply(res_app$results, function(r) r$K_hat),
-  sil_post = sapply(res_app$results, function(r) unname(r$silhouettes["post"])),
-  sil_net  = sapply(res_app$results, function(r) unname(r$silhouettes["net"])),
-  sil_cov  = sapply(res_app$results, function(r) unname(r$silhouettes["cov"])),
-  stringsAsFactors = FALSE
-)
+cat("Posterior plotting:\n")
+cat("  alpha_x =", alpha_x, "\n")
+cat("  alpha_y =", alpha_y, "\n")
+cat("  alpha_z =", alpha_z, "\n")
+cat("  label   =", label, "\n")
+cat("  outDir  =", outDir, "\n")
+cat("  show_edges =", edges_flag, "\n\n")
 
-## factors for tiles
-df3$alpha_x_f <- factor(df3$alpha_x, levels = sort(unique(df3$alpha_x)))
-df3$alpha_y_f <- factor(df3$alpha_y, levels = sort(unique(df3$alpha_y)))
-df3$alpha_z_f <- factor(df3$alpha_z, levels = sort(unique(df3$alpha_z)))
+## ---------------------------
+## Load utility plotting function
+## ---------------------------
+source(here("R_utilties", "plot_psm_with_annotations.R"))
 
-## palettes
-blue_pal   <- colorRampPalette(brewer.pal(9, "Blues"))(50)
-green_pal  <- colorRampPalette(brewer.pal(9, "Greens"))(50)
-purple_pal <- colorRampPalette(brewer.pal(9, "Purples"))(50)
+## ---------------------------
+## Load processed results
+## ---------------------------
+res_app <- readRDS(proc_path)
 
-##--------------------------------------------
-## Pick best alpha by each criterion
-##--------------------------------------------
-pick_best <- function(df, col) {
-  if (all(is.na(df[[col]]))) stop("All ", col, " are NA; cannot pick best alpha.")
-  df[which.max(df[[col]]), ]
+find_tag_by_alpha <- function(obj, ax, ay, az, tol = 1e-8) {
+  a_mat <- t(sapply(obj$results, function(r) r$alpha[1:3]))
+  idx <- which(abs(a_mat[,1]-ax) < tol & abs(a_mat[,2]-ay) < tol & abs(a_mat[,3]-az) < tol)
+  if (length(idx) == 0) stop(sprintf("No run found for alpha=(%.2f,%.2f,%.2f).", ax, ay, az))
+  names(obj$results)[idx[1]]
 }
 
-best_post <- pick_best(df3, "sil_post")
-best_net  <- pick_best(df3, "sil_net")
-best_cov  <- pick_best(df3, "sil_cov")
+tag <- find_tag_by_alpha(res_app, alpha_x, alpha_y, alpha_z)
+rr  <- res_app$results[[tag]]
 
-best_all <- rbind(
-  data.frame(criterion = "post", best_post, row.names = NULL),
-  data.frame(criterion = "net",  best_net,  row.names = NULL),
-  data.frame(criterion = "cov",  best_cov,  row.names = NULL)
-)
+psm_mat <- rr$psm
+z_hat   <- as.integer(rr$z_hat)
+K_hat   <- rr$K_hat
 
-write.csv(best_all, file.path(outDir, "best_alpha_by_each_silhouette.csv"), row.names = FALSE)
+cat("Matched tag:", tag, "\n")
+cat("K_hat =", K_hat, "\n\n")
 
-cat("\nBest alpha by silhouette criterion:\n")
-print(best_all[, c("criterion","alpha_x","alpha_y","alpha_z","K_hat","sil_post","sil_net","sil_cov")])
-
-##--------------------------------------------
-## Heatmap helper
-##--------------------------------------------
-make_heatmap <- function(df, fill_var, title, fill_lab, pal) {
-  ggplot(df, aes(x = alpha_x_f, y = alpha_y_f, fill = .data[[fill_var]])) +
-    geom_tile(color = "white") +
-    geom_text(aes(label = sprintf("%.2f", .data[[fill_var]])), size = 3) +
-    scale_fill_gradientn(colors = pal) +
-    facet_wrap(~ alpha_z_f) +
-    coord_equal() +
-    theme_minimal(base_size = 13) +
-    labs(
-      title = title,
-      x     = expression(alpha[x]),
-      y     = expression(alpha[y]),
-      fill  = fill_lab
-    ) +
-    theme(
-      plot.title = element_text(face = "bold"),
-      strip.text = element_text(face = "bold")
-    )
-}
-
-##--------------------------------------------
-## Heatmaps (3 silhouettes)
-##--------------------------------------------
-p_post <- make_heatmap(
-  df3, "sil_post",
-  "Posterior silhouette (D = 1 - PSM) \nover (alpha_x, alpha_y) \nfaceted by alpha_z",
-  "Silhouette", blue_pal
-)
-ggsave(file.path(outDir, "silhouette_post_heatmap_xyz.pdf"), p_post, width = 9, height = 6)
-
-p_net <- make_heatmap(
-  df3, "sil_net",
-  "Network silhouette (adjacency-profile distance) \nover (alpha_x, alpha_y) \nfaceted by alpha_z",
-  "Silhouette", green_pal
-)
-ggsave(file.path(outDir, "silhouette_net_heatmap_xyz.pdf"), p_net, width = 9, height = 6)
-
-p_cov <- make_heatmap(
-  df3, "sil_cov",
-  "Covariate silhouette (Euclidean on standardized xyz) \nover (alpha_x, alpha_y) \nfaceted by alpha_z",
-  "Silhouette", purple_pal
-)
-ggsave(file.path(outDir, "silhouette_cov_heatmap_xyz.pdf"), p_cov, width = 9, height = 6)
-
-##--------------------------------------------
-## Load data for coordinates (same isolate-drop as model run)
-##--------------------------------------------
-load(here("application_brain", "consensus_scale33_tau50.RData"))
+## ---------------------------
+## Load data + drop isolates (must match fitting)
+## ---------------------------
+load(data_path)  # A_bin_tau, coords
 diag(A_bin_tau) <- 0
 deg  <- rowSums(A_bin_tau)
 keep <- deg > 0
+
+A <- A_bin_tau[keep, keep, drop = FALSE]
+diag(A) <- 0
 coords_kept <- coords[keep, , drop = FALSE]
 
-##--------------------------------------------
-## Plot helper: make PSM heatmap + 3-view cluster map for a chosen "best"
-##--------------------------------------------
-make_view_nodes <- function(nodes_df, view = c("xy", "xz", "yz"),
-                            node_alpha = 0.95, node_size = 2.0) {
+stopifnot(nrow(A) == length(z_hat))
+
+## ---------------------------
+## Fixed ordering: Left → Right → Other (Brain-Stem)
+## ---------------------------
+hemi <- ifelse(grepl("^lh\\.", coords_kept$node), "Left",
+        ifelse(grepl("^rh\\.", coords_kept$node), "Right",
+        ifelse(grepl("^Left-",  coords_kept$node), "Left",
+        ifelse(grepl("^Right-", coords_kept$node), "Right", "Other"))))
+
+ord_fixed <- order(factor(hemi, levels = c("Left", "Right", "Other")),
+                   coords_kept$node)
+
+A_ord   <- A[ord_fixed, ord_fixed, drop = FALSE]
+psm_ord <- psm_mat[ord_fixed, ord_fixed, drop = FALSE]
+z_ord   <- z_hat[ord_fixed]
+hemi_ord <- hemi[ord_fixed]
+
+## annotation: hemisphere + estimated clustering (optional second column)
+ann_df <- data.frame(
+  hemisphere = factor(hemi_ord, levels = c("Left", "Right", "Other")),
+  est        = factor(z_ord)
+)
+
+ann_colors <- list(
+  hemisphere = c(Left = "#0072B2", Right = "#D55E00", Other = "#999999")
+  # est colors will be auto-generated by plot_psm_with_annotations()
+)
+
+## ---------------------------
+## Save PSM (ordered; show hemisphere + est bars)
+## ---------------------------
+title_psm <- sprintf("PSM (Left–Right order), alpha=(%.2f,%.2f,%.2f), K_hat=%d",
+                     alpha_x, alpha_y, alpha_z, K_hat)
+
+plot_psm_with_annotations(
+  psm         = psm_ord,
+  ann_df      = ann_df,
+  show_cols   = c("hemisphere", "est"),
+  ann_colors  = ann_colors,
+  gaps_by     = hemi_ord,   # only separate hemispheres
+  mat_palette = "Greys",
+  filename    = file.path(outDir, "psm_left_right_order.pdf")
+)
+
+## ---------------------------
+## Save adjacency (ordered; show hemisphere bar only)
+## ---------------------------
+title_adj <- sprintf("Adjacency (Left–Right order), alpha=(%.2f,%.2f,%.2f)",
+                     alpha_x, alpha_y, alpha_z)
+
+# For adjacency, we still use the same function; palette is fine for 0/1 too.
+plot_psm_with_annotations(
+  psm         = A_ord,
+  ann_df      = ann_df,
+  show_cols   = "hemisphere",
+  ann_colors  = ann_colors,
+  gaps_by     = hemi_ord,
+  mat_palette = "Greys",
+  filename    = file.path(outDir, "adjacency_left_right_order.pdf")
+)
+
+## ---------------------------
+## 3-view cluster plot helper
+## ---------------------------
+# Edge list for optional edges in 3-view plot (in original kept-node order)
+edges <- which(A == 1, arr.ind = TRUE)
+edges <- edges[edges[, 1] < edges[, 2], , drop = FALSE]
+
+edges_df <- data.frame(
+  x1 = coords_kept$x[edges[, 1]],
+  y1 = coords_kept$y[edges[, 1]],
+  z1 = coords_kept$z[edges[, 1]],
+  x2 = coords_kept$x[edges[, 2]],
+  y2 = coords_kept$y[edges[, 2]],
+  z2 = coords_kept$z[edges[, 2]]
+)
+
+make_view_plot <- function(nodes_df, edges_df, view = c("xy","xz","yz"),
+                           show_edges = TRUE,
+                           edge_alpha = 0.06, edge_lwd = 0.25,
+                           node_alpha = 0.95, node_size = 2.0) {
+
   view <- match.arg(view)
 
   if (view == "xy") {
-    xvar <- "x"; yvar <- "y"; ttl <- "Axial (x–y)"
+    xvar <- "x"; yvar <- "y"
+    ex1 <- "x1"; ey1 <- "y1"; ex2 <- "x2"; ey2 <- "y2"
+    ttl <- "Axial (x–y)"
   } else if (view == "xz") {
-    xvar <- "x"; yvar <- "z"; ttl <- "Coronal (x–z)"
+    xvar <- "x"; yvar <- "z"
+    ex1 <- "x1"; ey1 <- "z1"; ex2 <- "x2"; ey2 <- "z2"
+    ttl <- "Coronal (x–z)"
   } else {
-    xvar <- "y"; yvar <- "z"; ttl <- "Sagittal (y–z)"
+    xvar <- "y"; yvar <- "z"
+    ex1 <- "y1"; ey1 <- "z1"; ex2 <- "y2"; ey2 <- "z2"
+    ttl <- "Sagittal (y–z)"
   }
 
-  ggplot(nodes_df, aes(x = .data[[xvar]], y = .data[[yvar]], color = cluster)) +
-    geom_point(alpha = node_alpha, size = node_size) +
+  p <- ggplot()
+
+  if (show_edges && nrow(edges_df) > 0) {
+    p <- p + geom_segment(
+      data = edges_df,
+      aes(x = .data[[ex1]], y = .data[[ey1]], xend = .data[[ex2]], yend = .data[[ey2]]),
+      alpha = edge_alpha,
+      linewidth = edge_lwd
+    )
+  }
+
+  p +
+    geom_point(
+      data = nodes_df,
+      aes(x = .data[[xvar]], y = .data[[yvar]], color = cluster),
+      alpha = node_alpha,
+      size = node_size
+    ) +
     coord_equal() +
     theme_minimal(base_size = 12) +
     labs(title = ttl, x = xvar, y = yvar, color = "Cluster") +
@@ -194,98 +201,38 @@ make_view_nodes <- function(nodes_df, view = c("xy", "xz", "yz"),
           panel.grid.minor = element_blank())
 }
 
-save_best_plots <- function(best_row, criterion_label) {
+## ---------------------------
+## Save 3-view cluster plot (kept-node geometry; colored by z_hat)
+## ---------------------------
+nodes_df <- coords_kept
+nodes_df$cluster <- factor(z_hat)
 
-  best_tag <- best_row$tag
-  best_res <- res_app$results[[best_tag]]
+p_xy <- make_view_plot(nodes_df, edges_df, "xy", show_edges = edges_flag)
+p_xz <- make_view_plot(nodes_df, edges_df, "xz", show_edges = edges_flag)
+p_yz <- make_view_plot(nodes_df, edges_df, "yz", show_edges = edges_flag)
 
-  psm_mat <- best_res$psm
-  z_hat   <- as.integer(best_res$z_hat)
+p_views <- cowplot::plot_grid(p_xy, p_xz, p_yz, nrow = 1)
+title_cl <- sprintf("VI clusters, alpha=(%.2f,%.2f,%.2f), K_hat=%d",
+                    alpha_x, alpha_y, alpha_z, K_hat)
 
-  ## -------------------------------
-  ## 1) PSM heatmap (ggplot)
-  ## -------------------------------
-  ord <- order(z_hat)
-  psm_ord <- psm_mat[ord, ord, drop = FALSE]
+p_views <- cowplot::ggdraw(p_views) +
+  cowplot::draw_label(title_cl, x = 0.01, y = 0.98, hjust = 0, vjust = 1,
+                      fontface = "bold", size = 14)
 
-  psm_df <- data.frame(
-    i = rep(seq_len(nrow(psm_ord)), times = ncol(psm_ord)),
-    j = rep(seq_len(ncol(psm_ord)), each  = nrow(psm_ord)),
-    p = as.vector(psm_ord)
-  )
+ggsave(file.path(outDir, "clusters_3views.pdf"),
+       p_views, width = 12, height = 4, dpi = 300)
 
-  title_psm <- sprintf(
-    "PSM (ordered by VI partition) — best by %s silhouette: (%.2f, %.2f, %.2f)",
-    criterion_label, best_row$alpha_x, best_row$alpha_y, best_row$alpha_z
-  )
+## ---------------------------
+## Save metadata
+## ---------------------------
+writeLines(c(
+  sprintf("tag: %s", tag),
+  sprintf("alpha_x: %.4f", alpha_x),
+  sprintf("alpha_y: %.4f", alpha_y),
+  sprintf("alpha_z: %.4f", alpha_z),
+  sprintf("K_hat: %d", K_hat),
+  sprintf("show_edges: %s", edges_flag),
+  "order: Left -> Right -> Other (by node name)"
+), con = file.path(outDir, "run_info.txt"))
 
-  p_psm <- ggplot(psm_df, aes(x = j, y = i, fill = p)) +
-    geom_tile() +
-    scale_fill_gradientn(colors = blue_pal, limits = c(0, 1)) +
-    coord_equal() +
-    theme_minimal(base_size = 12) +
-    labs(title = title_psm, x = "Node index (ordered)", y = "Node index (ordered)", fill = "PSM") +
-    theme(plot.title = element_text(face = "bold"))
-
-  ggsave(
-    file.path(outDir, sprintf("best_%s_psm_heatmap.pdf", criterion_label)),
-    p_psm, width = 8, height = 7, dpi = 300
-  )
-
-  ## -------------------------------
-  ## 2) 3-view spatial plots
-  ## -------------------------------
-  nodes_df <- coords_kept
-  nodes_df$cluster <- factor(z_hat)
-
-  p_xy <- make_view_nodes(nodes_df, "xy")
-  p_xz <- make_view_nodes(nodes_df, "xz")
-  p_yz <- make_view_nodes(nodes_df, "yz")
-
-  p_views <- cowplot::plot_grid(p_xy, p_xz, p_yz, nrow = 1)
-
-  ggsave(
-    filename = file.path(outDir, sprintf("best_%s_clusters_3views.pdf", criterion_label)),
-    plot     = p_views,
-    width    = 12,
-    height   = 4,
-    dpi      = 300
-  )
-
-  ## -------------------------------
-  ## 3) Matrix plots (PSM + adjacency)
-  ## -------------------------------
-  # adjacency matrix A must already be loaded & isolate-filtered
-  pdf(file.path(outDir, sprintf("best_%s_psm_matrix.pdf", criterion_label)),
-      width = 7, height = 7)
-  plot_matrix_with_clusters(
-    psm_mat, z_hat,
-    type  = "psm",
-    title = sprintf("PSM — best by %s silhouette", criterion_label)
-  )
-  dev.off()
-
-  pdf(file.path(outDir, sprintf("best_%s_adj_matrix.pdf", criterion_label)),
-      width = 7, height = 7)
-  plot_matrix_with_clusters(
-    A_bin_tau[keep, keep] , z_hat,
-    type  = "adj",
-    title = sprintf("Adjacency — best by %s silhouette", criterion_label)
-  )
-  dev.off()
-
-  invisible(NULL)
-}
-
-##--------------------------------------------
-## Produce posterior plots for all three "best" criteria
-##--------------------------------------------
-save_best_plots(best_post, "post")
-save_best_plots(best_net,  "net")
-save_best_plots(best_cov,  "cov")
-
-cat("\nSaved:\n",
-    " - silhouette heatmaps (post/net/cov)\n",
-    " - best_post/net/cov_psm_heatmap.pdf\n",
-    " - best_post/net/cov_clusters_3views.pdf\n",
-    "in:\n  ", outDir, "\n")
+cat("Saved plots to:\n  ", outDir, "\n")

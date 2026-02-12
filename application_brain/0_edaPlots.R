@@ -11,6 +11,8 @@ library(tools)
 library(ggplot2)
 library(cowplot)   # for arranging plots
 
+# Load utility plotting function
+source(here("R_utilties", "plottingFunctions.R"))
 # ---------------------------
 # 1) Drop isolated nodes
 # ---------------------------
@@ -26,6 +28,21 @@ message(sprintf("Dropping %d isolated nodes (degree 0) out of %d total.",
 A <- A_bin_tau[keep, keep, drop = FALSE]
 coords_kept <- coords[keep, , drop = FALSE]
 coords_kept$degree <- deg[keep]
+
+# ---------------------------
+# Fixed anatomical order: Left - Right
+# ---------------------------
+
+hemi <- ifelse(grepl("^lh\\.", coords_kept$node), "Left",
+        ifelse(grepl("^rh\\.", coords_kept$node), "Right",
+        ifelse(grepl("^Left-",  coords_kept$node), "Left",
+        ifelse(grepl("^Right-", coords_kept$node), "Right", "Other"))))
+
+ord_fixed <- order(hemi, coords_kept$node)
+
+A_ord <- A[ord_fixed, ord_fixed, drop = FALSE]
+coords_ord <- coords_kept[ord_fixed, ]
+hemi_ord <- hemi[ord_fixed]
 
 # ---------------------------
 # 2) Edge list (upper triangle)
@@ -124,4 +141,27 @@ ggsave(
   width = 12,
   height = 4,
   dpi = 300
+)
+
+# ---------------------------
+# 6) Adjacency matrix visualization (ggplot)
+# ---------------------------
+ann_df <- data.frame(
+  hemisphere = factor(hemi_ord, levels = c("Left", "Right"))
+)
+
+ann_colors <- list(
+  hemisphere = c(
+    Left  = "#0072B2",
+    Right = "#D55E00"
+  )
+)
+plot_psm_with_annotations(
+  psm         = A_ord,
+  ann_df      = ann_df,
+  show_cols   = "hemisphere",
+  ann_colors  = ann_colors,
+  gaps_by     = hemi_ord,
+  mat_palette = "Greys",
+  filename    = here("application_brain", "figures", "adjacency_matrix_hemi.pdf")
 )
