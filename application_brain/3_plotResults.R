@@ -107,28 +107,28 @@ ann_colors <- list(
 )
 
 
-## ---------------------------
-## Save adjacency (ordered; show hemisphere bar only)
-## ---------------------------
-title_adj <- sprintf("Adjacency (Left–Right order), alpha=(%.2f,%.2f,%.2f)",
-                     alpha_x, alpha_y, alpha_z)
+# ## ---------------------------
+# ## Save adjacency (ordered; show hemisphere bar only)
+# ## ---------------------------
+# title_adj <- sprintf("Adjacency (Left–Right order), alpha=(%.2f,%.2f,%.2f)",
+#                      alpha_x, alpha_y, alpha_z)
 
-plot_matrix_with_annotations(
-  M          = A_ord,
-  type       = "adj",
-  ann_df     = data.frame(
-    hemisphere = factor(hemi_ord, levels = c("Left","Right","Other")),
-    est        = factor(z_ord)
-  ),
-  show_cols  = c("hemisphere", "est"),
-  ann_colors = list(
-    hemisphere = c(Left = "#0072B2", Right = "#D55E00", Other = "#999999")
-    # est colors auto-generated
-  ),
-  gaps_by    = hemi_ord,  # hemisphere separation (use z_ord if you prefer cluster gaps)
-  main = title_adj,
-  filename   = file.path(outDir, "adjacency_left_right_order.pdf")
-)
+# plot_matrix_with_annotations(
+#   M          = A_ord,
+#   type       = "adj",
+#   ann_df     = data.frame(
+#     hemisphere = factor(hemi_ord, levels = c("Left","Right","Other")),
+#     est        = factor(z_ord)
+#   ),
+#   show_cols  = c("hemisphere", "est"),
+#   ann_colors = list(
+#     hemisphere = c(Left = "#0072B2", Right = "#D55E00", Other = "#999999")
+#     # est colors auto-generated
+#   ),
+#   gaps_by    = hemi_ord,  # hemisphere separation (use z_ord if you prefer cluster gaps)
+#   main = title_adj,
+#   filename   = file.path(outDir, "adjacency_left_right_order.pdf")
+# )
 
 
 ## ---------------------------
@@ -166,6 +166,31 @@ plot_matrix_with_annotations(
   main = title_psm,
   filename   = file.path(outDir, "psm_psmOrder.pdf")
 )
+
+## ---------------------------
+## Save adjacency (ordered;)
+## ---------------------------
+
+title_adj <- sprintf("Adjacency , alpha=(%.2f,%.2f,%.2f)",
+                     alpha_x, alpha_y, alpha_z)
+
+plot_matrix_with_annotations(
+  M          = A_ord2,
+  type       = "adj",
+  ann_df     = data.frame(
+    hemisphere = factor(hemi_ord, levels = c("Left","Right","Other")),
+    est        = factor(z_ord)
+  ),
+  show_cols  = c("hemisphere", "est"),
+  ann_colors = list(
+    hemisphere = c(Left = "#0072B2", Right = "#D55E00", Other = "#999999")
+    # est colors auto-generated
+  ),
+  gaps_by    = z_ord,  # hemisphere separation (use z_ord if you prefer cluster gaps)
+  main = title_adj,
+  filename   = file.path(outDir, "adjacency_left_right_order.pdf")
+)
+
 
 ## ---------------------------
 ## 3-view cluster plot helper
