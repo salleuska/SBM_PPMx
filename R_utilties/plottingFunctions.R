@@ -74,10 +74,11 @@ plot_matrix_with_annotations <- function(M,
     rownames(ann_df) <- rn
 
     if (!is.null(show_cols)) {
-      ann_df <- ann_df[, intersect(show_cols, colnames(ann_df)), drop = FALSE]
+      ann_df <- ann_df[, show_cols, drop = FALSE]
     }
     if (ncol(ann_df) == 0) ann_df <- NULL
   }
+
 
   ## -------------------------
   ## Default annotation colors
@@ -122,6 +123,12 @@ plot_matrix_with_annotations <- function(M,
   ## -------------------------
   ## Plot
   ## -------------------------
+  ann_row_df <- ann_df
+  ann_col_df <- ann_df
+
+  # remove column names for top annotations only
+  colnames(ann_col_df) <- NULL
+
   pheatmap::pheatmap(
     M,
     color             = mat_cols,
@@ -130,6 +137,7 @@ plot_matrix_with_annotations <- function(M,
     cluster_cols      = FALSE,
     show_rownames     = FALSE,
     show_colnames     = FALSE,
+    annotation_col    = ann_df,
     annotation_row    = ann_df,
     annotation_colors = ann_colors,
     border_color      = border_color,
