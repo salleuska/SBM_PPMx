@@ -10,6 +10,19 @@ dir.create(dirname(out_path), recursive = TRUE, showWarnings = FALSE)
 
 res_app <- readRDS(proc_path)
 
+data_path <- here("application_brain", "consensus_scale33_tau50.RData")
+load(data_path)  # expects A_bin_tau
+
+diag(A_bin_tau) <- 0
+keep <- rowSums(A_bin_tau) > 0
+A <- A_bin_tau[keep, keep, drop = FALSE]
+diag(A) <- 0
+
+# Fixed network dissimilarity between adjacency profiles:
+# D_ij = ||A_{i·} - A_{j·}||_2
+D_net <- stats::dist(A, method = "euclidean")
+n_net <- nrow(A)
+
 # ---- helpers ----
 alpha_key <- function(a) paste0(as.integer(a[1]), as.integer(a[2]), as.integer(a[3]))
 
@@ -55,17 +68,22 @@ for (k in order_keys) {
 
 get_K <- function(r) if (is.null(r)) NA_integer_ else as.integer(r$K_hat)
 
-get_sil_net <- function(r) {
+get_sil_net_vi <- function(r, D_net, n_net) {
   if (is.null(r)) return(NA_real_)
-  # robust to different storage
-  if (!is.null(r$silhouettes) && "net" %in% names(r$silhouettes)) return(as.numeric(r$silhouettes[["net"]]))
-  if (!is.null(r$sil_net)) return(as.numeric(r$sil_net))
-  NA_real_
+
+  z <- r$z_hat
+  if (length(z) != n_net) {
+    stop(sprintf("Length mismatch: z_hat has %d entries but network has %d nodes.", length(z), n_net))
+  }
+
+  cl <- as.integer(factor(z))  # cluster labels 1..K
+  sil <- cluster::silhouette(cl, D_net)
+  mean(sil[, "sil_width"])
 }
 
-K_row  <- sapply(order_keys, function(k) get_K(key_to_run[[k]]))
-silrow <- sapply(order_keys, function(k) get_sil_net(key_to_run[[k]]))
 
+K_row  <- sapply(order_keys, function(k) get_K(key_to_run[[k]]))
+silrow <- sapply(order_keys, function(k) get_sil_net_vi(key_to_run[[k]], D_net, n_net))
 # format
 K_str   <- ifelse(is.na(K_row), "--", as.character(K_row))
 sil_str <- ifelse(is.na(silrow), "--", sprintf("%.3f", silrow))
