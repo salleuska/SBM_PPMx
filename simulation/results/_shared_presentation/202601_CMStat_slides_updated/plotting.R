@@ -54,7 +54,8 @@ p_ari_mean <- ggplot(df, aes(x = alpha, y = ARI_mean, color = scenario)) +
   labs(
     title = "ARI vs alpha",
     x     = expression(alpha),
-    y     = expression(E(ARI(z, z[0]) ~ "|" ~ data))
+    y = expression(E(ARI(bold(rho)[n], bold(tilde(rho))[n] ~ "|" ~ data)))
+#    y     = expression(E(ARI(z, z[0]) ~ "|" ~ data))
   ) +
   theme(
     plot.title      = element_text(face = "bold"),

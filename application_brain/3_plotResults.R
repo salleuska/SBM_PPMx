@@ -166,7 +166,6 @@ plot_matrix_with_annotations(
     estimate        = est_colors
   ),
   gaps_by    = z_ord,
-  main       = title_adj,
   filename   = file.path(outDir, "adjacency_clusterOrder.pdf")
 )
 

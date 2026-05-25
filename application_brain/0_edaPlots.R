@@ -1,8 +1,5 @@
 # ============================================================ 
-# Brain network quick-prep + 3-view ggplot (simple)
-# - assumes you already loaded: A_bin_tau (NxN), coords (Nx3 + node)
-# - drops isolated nodes (degree 0)
-# - makes 3 orthogonal 2D views with light edges + nodes
+# Explorative data analysis plots
 # ============================================================
 library(Rcpp)
 library(here)
@@ -73,25 +70,22 @@ make_view_plot <- function(nodes_df, edges_df, view = c("xy", "xz", "yz"),
                            node_alpha = 0.90, node_size = 1.8) {
 
   view <- match.arg(view)
-
+ 
   if (view == "xy") {
     xvar <- "x"; yvar <- "y"
     ex1 <- "x1"; ey1 <- "y1"; ex2 <- "x2"; ey2 <- "y2"
-    ttl <- "Axial"
-    xlab <- "x1"; ylab <- "x2"
+    ttl <- "Axial";    xlab <- "x1"; ylab <- "x2"
   } else if (view == "xz") {
     xvar <- "x"; yvar <- "z"
     ex1 <- "x1"; ey1 <- "z1"; ex2 <- "x2"; ey2 <- "z2"
-    ttl <- "Coronal"
-    xlab <- "x1"; ylab <- "x3"
+    ttl <- "Coronal";  xlab <- "x1"; ylab <- "x3"
   } else { # "yz"
     xvar <- "y"; yvar <- "z"
     ex1 <- "y1"; ey1 <- "z1"; ex2 <- "y2"; ey2 <- "z2"
-    ttl <- "Sagittal"
-    xlab <- "x2"; ylab <- "x3"
+    ttl <- "Sagittal"; xlab <- "x2"; ylab <- "x3"
   }
 
-  p <- ggplot()
+   p <- ggplot()
 
   if (show_edges && nrow(edges_df) > 0) {
     p <- p + geom_segment(
@@ -124,15 +118,35 @@ make_view_plot <- function(nodes_df, edges_df, view = c("xy", "xz", "yz"),
 # ---------------------------
 # 4) Make  plots
 # ---------------------------
-p_axial   <- make_view_plot(coords_kept, edges_df, view = "xy")
-p_coronal <- make_view_plot(coords_kept, edges_df, view = "xz")
-p_sagittal <- make_view_plot(coords_kept, edges_df, view = "yz")
-p_all <- cowplot::plot_grid(
-  p_axial,
-  p_coronal,
-  p_sagittal,
-  nrow = 1
-)
+
+p_axial <- make_view_plot(coords_kept, edges_df, "xy")
+p_coronal <- make_view_plot(coords_kept, edges_df, "xz")
+p_sagittal <- make_view_plot(coords_kept, edges_df, "yz")
+
+
+zlim <- range(coords_kept$z, na.rm = TRUE)
+
+p_coronal  <- p_coronal  + coord_equal(ylim = zlim)
+p_sagittal <- p_sagittal + coord_equal(ylim = zlim)
+
+xlim <- range(coords_kept$x, na.rm = TRUE)
+
+p_axial   <- p_axial   + coord_equal(xlim = xlim)
+p_coronal <- p_coronal + coord_equal(xlim = xlim)  # keeps the zlim you set above too
+
+
+p_all <- cowplot::plot_grid(p_axial, p_coronal, p_sagittal, 
+  nrow = 1, align = "none",   axis = "tblr")
+
+# p_axial   <- make_view_plot(coords_kept, edges_df, view = "xy")
+# p_coronal <- make_view_plot(coords_kept, edges_df, view = "xz")
+# p_sagittal <- make_view_plot(coords_kept, edges_df, view = "yz")
+# p_all <- cowplot::plot_grid(
+#   p_axial,no
+#   p_coronal,
+#   p_sagittal,
+#   nrow = 1
+# )
 
 # ---------------------------
 # 5) Optional: save to file
@@ -144,22 +158,14 @@ if (!dir.exists(fig_dir)) {
   dir.create(fig_dir, recursive = TRUE)
 }
 
-ggsave(here(fig_dir, "raw_sagittal.png"), p_sagittal, width=5, height=5, dpi=300)
-ggsave(here(fig_dir, "raw_coronal.png"), p_coronal, width=5, height=5, dpi=300)
-ggsave(here(fig_dir, "raw_axial.png"), p_axial, width=5, height=5, dpi=300)
+ggsave(here(fig_dir, "raw_sagittal.pdf"), p_sagittal, width=5, height=5, dpi=300)
+ggsave(here(fig_dir, "raw_coronal.pdf"), p_coronal, width=5, height=5, dpi=300)
+ggsave(here(fig_dir, "raw_axial.pdf"), p_axial, width=5, height=5, dpi=300)
 
-p_all <- plot_grid(
-  p_axial,
-  p_coronal,
-  p_sagittal,
-  nrow = 1,
-  align = "hv",
-  rel_widths = c(1, 1, 1)
-)
 
 # Save the 3-view plot
 ggsave(
-  filename = here("application_brain", "figures", "brain_network_3views.png"),
+  filename = here("application_brain", "figures", "brain_network_3views.pdf"),
   plot = p_all,
   width = 12,
   height = 4,
@@ -173,12 +179,14 @@ ggsave(
 plot_matrix_with_annotations(
   M        = A_ord,
   type     = "adj",
-  filename = here("application_brain", "figures", "rew_adjacency.pdf")
+  filename = here("application_brain", "figures", "raw_adjacency.pdf")
 )
 
 ########
-ann_df     = data.frame(
-    hemisphere = factor(hemi, levels = c("Right","Left", "Other"))
+hemi_ord <- hemi[ord_fixed]
+
+ann_df <- data.frame(
+  hemisphere = factor(hemi_ord, levels = c("Right","Other","Left"))
 )
 
 
@@ -187,7 +195,8 @@ plot_matrix_with_annotations(
   type     = "adj",
   ann_df   = ann_df, 
   show_cols = "hemisphere",
-  ann_colors = list(hemisphere = c(Left="#0072B2", Right="#D55E00", Other="#999999")),
-  gaps_by  = hemi,
+  ann_colors = list(
+    hemisphere = c(Left = "#4D4D4D",  Other = "#D9D9D9", Right = "#A6A6A6")),
+  gaps_by  = hemi_ord,
   filename = here("application_brain", "figures", "adjacency_left_right_order.pdf")
 )
