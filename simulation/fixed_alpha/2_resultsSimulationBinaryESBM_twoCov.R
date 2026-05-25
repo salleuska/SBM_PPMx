@@ -72,7 +72,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
 
     res <- readRDS(f)
 
-    Z_post <- res$Z_post
+    Z_post <- res$mcmcpost$z_post
     seed   <- res$seed
     N_iter <- res$N_iter
 
