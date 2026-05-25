@@ -16,7 +16,7 @@ library(cluster)    # to compute silhouette
 ##---------------------------##
 
 ## Paths to results directory and simulation files
-results_dir <- here("simulation", "results", "oneCov")
+results_dir <- here("simulation", "fixed_alpha", "results", "oneCov")
 sim_path_neutral   <- here("simulation", "data", "binarySBM_1cov_neutral.rds")
 sim_path_info      <- here("simulation", "data", "binarySBM_1cov_informative.rds")
 sim_path_mis_rand  <- here("simulation", "data", "binarySBM_1cov_mislead_random.rds")
@@ -76,7 +76,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
 
     res <- readRDS(f)
 
-    Z_post <- res$Z_post
+    Z_post <- res$mcmcpost$z_post
     alpha  <- res$alpha
     seed   <- res$seed
     N_iter <- res$N_iter
@@ -133,7 +133,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
 ##---------------------------------------------------------##
 ## Build res & save for seach scenarion
 ##---------------------------------------------------------##
-out_dir <- here("simulation", "results", "processed", "oneCov")
+out_dir <- here("simulation", "fixed_alpha", "results", "processed", "oneCov")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 ##---------------------------------------------------------##

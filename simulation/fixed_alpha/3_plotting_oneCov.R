@@ -10,28 +10,28 @@ library(tools)
 library(here)
 ################################
 ## set directory for output
-outDir <- here("simulation", "results", "processed", "oneCov")
+outDir <- here("simulation", "fixed_alpha", "results", "processed", "oneCov")
 dir.create(outDir, recursive = TRUE, showWarnings = FALSE)
 ################################
 
 ## read processed results (1-cov)
 res_neutral <- readRDS(
-  here("simulation", "results", "processed", "oneCov",
+  here("simulation", "fixed_alpha", "results", "processed", "oneCov",
        "scenario_1cov_neutral_results.rds")
 )
 
 res_info <- readRDS(
-  here("simulation", "results", "processed", "oneCov",
+  here("simulation", "fixed_alpha", "results", "processed", "oneCov",
        "scenario_1cov_informative_results.rds")
 )
 
 res_mis_rand <- readRDS(
-  here("simulation", "results", "processed", "oneCov",
+  here("simulation", "fixed_alpha", "results", "processed", "oneCov",
        "scenario_1cov_mislead_random_results.rds")
 )
 
 res_mis_shift <- readRDS(
-  here("simulation", "results", "processed", "oneCov",
+  here("simulation", "fixed_alpha", "results", "processed", "oneCov",
        "scenario_1cov_mislead_shifted_results.rds")
 )
 ################################

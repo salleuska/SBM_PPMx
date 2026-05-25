@@ -4,13 +4,13 @@ library(RColorBrewer)
 library(scales)
 
 ## read processed results (2-cov)
-res_NN <- readRDS(here("simulation", "results", "processed", "twoCov",
+res_NN <- readRDS(here("simulation", "fixed_alpha", "results", "processed", "twoCov",
                        "scenario_2cov_NN_results.rds"))
-res_IN <- readRDS(here("simulation", "results", "processed", "twoCov",
+res_IN <- readRDS(here("simulation", "fixed_alpha", "results", "processed", "twoCov",
                        "scenario_2cov_IN_results.rds"))
-res_NI <- readRDS(here("simulation", "results", "processed", "twoCov",
+res_NI <- readRDS(here("simulation", "fixed_alpha", "results", "processed", "twoCov",
                        "scenario_2cov_NI_results.rds"))
-res_II <- readRDS(here("simulation", "results", "processed", "twoCov",
+res_II <- readRDS(here("simulation", "fixed_alpha", "results", "processed", "twoCov",
                        "scenario_2cov_II_results.rds"))
 
 extract_df_2cov <- function(obj, scen_name) {
@@ -67,7 +67,7 @@ p_heat_ari <- ggplot(df2, aes(x = alpha1_f, y = alpha2_f, fill = ARI_vi)) +
 
 print(p_heat_ari)
 
-outDir2 <- here("simulation", "results", "processed", "twoCov")
+outDir2 <- here("simulation", "fixed_alpha", "results", "processed", "twoCov")
 dir.create(outDir2, recursive = TRUE, showWarnings = FALSE)
 
 ggsave(

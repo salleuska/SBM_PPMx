@@ -86,7 +86,7 @@ alpha_vec      <- alpha_in
 ## ------------------------------- ##
 cat("Starting ESBM...\n")
 
-Z_post <- esbm(
+mcmcpost <- esbm(
   Y      = Y,
   seed   = seed,
   N_iter = N_iter,
@@ -110,7 +110,7 @@ cat("Done.\n\n")
 ## ------------------------------- ##
 ## Save output
 ## ------------------------------- ##
-out_dir <- here("simulation", "results", "oneCov")
+out_dir <- here("simulation", "fixed_alpha", "results", "oneCov")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 alpha_tag  <- gsub("\\.", "p", sprintf("%.2f", alpha_in))
@@ -124,7 +124,7 @@ out_file <- file.path(
 
 saveRDS(
   list(
-    Z_post   = Z_post,
+    mcmcpost = mcmcpost,
     file     = data_path,
     alpha    = alpha_in,
     seed     = seed,

@@ -15,7 +15,7 @@ library(cluster)    # to compute silhouette
 ##---------------------------##
 ## Settings
 ##---------------------------##
-results_dir <- here("simulation", "results", "twoCov")
+results_dir <- here("simulation", "fixed_alpha", "results", "twoCov")
 
 sim_path_NN <- here("simulation", "data", "binarySBM_2cov_NN.rds")
 sim_path_IN <- here("simulation", "data", "binarySBM_2cov_IN.rds")
@@ -132,7 +132,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
 ##---------------------------------------------------------##
 ## Build res & save for each scenario
 ##---------------------------------------------------------##
-out_dir <- here("simulation", "results", "processed", "twoCov")
+out_dir <- here("simulation", "fixed_alpha", "results", "processed", "twoCov")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 combined_NN <- res_for_scenario(sim_path_NN, files_NN)
