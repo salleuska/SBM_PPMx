@@ -34,62 +34,172 @@
 #    Inputs:
 #        args = list(m0 = ..., s0 = ...)  with s0 > 0
 ################################################################################
-similarity_ppmx_gaussian_mean <- function(Z_minus_v, cluster_sizes, v_index, H, x, args) {
-  
-  # --- hyperparameters
-  if (!is.numeric(args$m0) || !is.numeric(args$s0) || args$s0 <= 0)
+
+similarity_ppmx_gaussian_mean <- function(mode, x, args,
+                                          Z_minus_v = NULL,
+                                          cluster_sizes = NULL,
+                                          v_index = NULL,
+                                          H = NULL,
+                                          Z = NULL) {
+
+  if (!is.numeric(args$m0) || !is.numeric(args$s0) || args$s0 <= 0) {
     stop("args must contain m0 (numeric) and s0 > 0.")
-  if (!is.numeric(x))
+  }
+  if (!is.numeric(x)) {
     stop("x must be a numeric vector.")
+  }
 
-  m0   <- args$m0
-  var0 <- (args$s0^2)         # prior variance
+  m0 <- args$m0
+  var0 <- args$s0^2
 
-  # --- cluster sufficient statistics (excluding v)
-  x_minus <- x[-v_index]
-  n_h  <- as.numeric(cluster_sizes)                 # cluster sizes
-  s1_h <- as.numeric(crossprod(Z_minus_v, x_minus)) # sum of x in each cluster
-  bar_h <- ifelse(n_h > 0, s1_h / n_h, 0)
+  if (mode == "node") {
 
-  # --- posterior mean and variance of μ_h | x_{S_h^{(-v)}}
-  inv_var0 <- 1 / var0
-  var_h <- 1 / (inv_var0 + n_h)
-  m_h   <- var_h * (inv_var0 * m0 + n_h * bar_h)
+    x_minus <- x[-v_index]
+    n_h <- as.numeric(cluster_sizes)
+    s1_h <- as.numeric(crossprod(Z_minus_v, x_minus))
+    bar_h <- ifelse(n_h > 0, s1_h / n_h, 0)
 
-  # --- predictive variances: τ_h^2 = 1 + var_h
-  var_pred_old <- 1 + var_h    # existing clusters
-  var_pred_new <- 1 + var0     # new cluster
+    inv_var0 <- 1 / var0
+    var_h <- 1 / (inv_var0 + n_h)
+    m_h <- var_h * (inv_var0 * m0 + n_h * bar_h)
 
-  # --- log predictive densities (up to additive constant)
-  xv <- x[v_index]
-  log_old <- -0.5 * (log(2 * pi * var_pred_old) + (xv - m_h)^2 / var_pred_old)
-  log_new <- -0.5 * (log(2 * pi * var_pred_new) + (xv - m0)^2 / var_pred_new)
+    var_pred_old <- 1 + var_h
+    var_pred_new <- 1 + var0
 
-  c(log_old, log_new)          # vector of length H + 1
+    xv <- x[v_index]
+    log_old <- -0.5 * (log(2 * pi * var_pred_old) + (xv - m_h)^2 / var_pred_old)
+    log_new <- -0.5 * (log(2 * pi * var_pred_new) + (xv - m0)^2 / var_pred_new)
+
+    return(c(log_old, log_new))
+  }
+
+  if (mode == "partition") {
+
+    H <- ncol(Z)
+    log_g_h <- numeric(H)
+
+    for (h in seq_len(H)) {
+      x_h <- x[Z[, h] == 1]
+      n_h <- length(x_h)
+      s1_h <- sum(x_h)
+
+      log_g_h[h] <-
+        -0.5 * log(1 + n_h * var0) -
+        0.5 * (sum(x_h^2) + m0^2 / var0 -
+                 (s1_h + m0 / var0)^2 / (n_h + 1 / var0))
+    }
+
+    return(log_g_h)
+  }
+
+  stop("mode must be either 'node' or 'partition'.")
 }
 
 
-similarity_dirichlet <- function(Z_minus_v, cluster_sizes, v_index, H, 
-                                x, args) {
-  # --- check inputs
-  # x: factor with C categories
+similarity_dirichlet <- function(mode, x, args,
+                                 Z_minus_v = NULL, cluster_sizes = NULL,
+                                 v_index = NULL, H = NULL,
+                                 Z = NULL) {
+
   stopifnot(is.factor(x))
-  
+
   params <- as.numeric(args$params)
-  if (length(params) != nlevels(x))
+  if (length(params) != nlevels(x)) {
     stop("args$params must have length equal to nlevels(x).")
+  }
+
   params_sum <- sum(params)
+  X <- stats::model.matrix(~ x - 1)
 
-  # --- useful quantities
-  # One-hot representation computed on the fly (fast for one covariate)
-  X <- stats::model.matrix(~ x - 1)               # V x C
-  Vx <- crossprod(Z_minus_v, X[-v_index, , drop = FALSE])  # H x C
-  cat_idx <- as.integer(x[v_index])               # 1..C
+  if (mode == "node") {
 
-  # --- log densities
-  log_old <- (Vx[, cat_idx] + params[cat_idx]) / (cluster_sizes + params_sum)
-  log_new <-  params[cat_idx] / params_sum
+    Vx <- crossprod(Z_minus_v, X[-v_index, , drop = FALSE])
+    cat_idx <- as.integer(x[v_index])
 
-  log(c(log_old, log_new))                        # numeric length H+1, log-scale
+    prob_old <- (Vx[, cat_idx] + params[cat_idx]) / (cluster_sizes + params_sum)
+    prob_new <- params[cat_idx] / params_sum
+
+    return(log(c(prob_old, prob_new)))
+  }
+
+  if (mode == "partition") {
+
+    H <- ncol(Z)
+    log_g_h <- numeric(H)
+
+    for (h in seq_len(H)) {
+      counts_h <- colSums(X[Z[, h] == 1, , drop = FALSE])
+      n_h <- sum(counts_h)
+
+      log_g_h[h] <-
+        lgamma(params_sum) - lgamma(params_sum + n_h) +
+        sum(lgamma(params + counts_h) - lgamma(params))
+    }
+
+    return(log_g_h)
+  }
+
+  stop("mode must be either 'node' or 'partition'.")
 }
+
+
+## previous verison before mode (parition or node)
+# similarity_ppmx_gaussian_mean <- function(Z_minus_v, cluster_sizes, v_index, H, x, args) {
+  
+#   # --- hyperparameters
+#   if (!is.numeric(args$m0) || !is.numeric(args$s0) || args$s0 <= 0)
+#     stop("args must contain m0 (numeric) and s0 > 0.")
+#   if (!is.numeric(x))
+#     stop("x must be a numeric vector.")
+
+#   m0   <- args$m0
+#   var0 <- (args$s0^2)         # prior variance
+
+#   # --- cluster sufficient statistics (excluding v)
+#   x_minus <- x[-v_index]
+#   n_h  <- as.numeric(cluster_sizes)                 # cluster sizes
+#   s1_h <- as.numeric(crossprod(Z_minus_v, x_minus)) # sum of x in each cluster
+#   bar_h <- ifelse(n_h > 0, s1_h / n_h, 0)
+
+#   # --- posterior mean and variance of μ_h | x_{S_h^{(-v)}}
+#   inv_var0 <- 1 / var0
+#   var_h <- 1 / (inv_var0 + n_h)
+#   m_h   <- var_h * (inv_var0 * m0 + n_h * bar_h)
+
+#   # --- predictive variances: τ_h^2 = 1 + var_h
+#   var_pred_old <- 1 + var_h    # existing clusters
+#   var_pred_new <- 1 + var0     # new cluster
+
+#   # --- log predictive densities (up to additive constant)
+#   xv <- x[v_index]
+#   log_old <- -0.5 * (log(2 * pi * var_pred_old) + (xv - m_h)^2 / var_pred_old)
+#   log_new <- -0.5 * (log(2 * pi * var_pred_new) + (xv - m0)^2 / var_pred_new)
+
+#   c(log_old, log_new)          # vector of length H + 1
+# }
+
+
+# similarity_dirichlet <- function(Z_minus_v, cluster_sizes, v_index, H, 
+#                                 x, args) {
+#   # --- check inputs
+#   # x: factor with C categories
+#   stopifnot(is.factor(x))
+  
+#   params <- as.numeric(args$params)
+#   if (length(params) != nlevels(x))
+#     stop("args$params must have length equal to nlevels(x).")
+#   params_sum <- sum(params)
+
+#   # --- useful quantities
+#   # One-hot representation computed on the fly (fast for one covariate)
+#   X <- stats::model.matrix(~ x - 1)               # V x C
+#   Vx <- crossprod(Z_minus_v, X[-v_index, , drop = FALSE])  # H x C
+#   cat_idx <- as.integer(x[v_index])               # 1..C
+
+#   # --- log densities
+#   log_old <- (Vx[, cat_idx] + params[cat_idx]) / (cluster_sizes + params_sum)
+#   log_new <-  params[cat_idx] / params_sum
+
+#   log(c(log_old, log_new))                        # numeric length H+1, log-scale
+# }
 
