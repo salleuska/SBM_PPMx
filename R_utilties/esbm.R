@@ -24,26 +24,62 @@ urn_GN <- function(v_minus,gamma_GN){
 ####################################################################################
 # GIBBS SAMPLER FOR THE EXTENDED STOCHASTIC BLOCK MODEL  ###########################
 ####################################################################################
-
-# Inputs:
-# Y = VxV symmetric adjacency matrix
-# z_init = V-vector of initialization assignment for each node (default = one cluster for each node)
-# a,b = parameters of the Beta prior on the thetas
-# prior = string in c("DP","PY","DM","GN")
-# if prior=="DP", alpha_PY must be set
-# if prior=="PY", alpha_PY and sigma_PY must be set
-# if prior=="DM", beta_DM and H_DM must be set
-# if prior=="GN", gamma_GN must be set
-
-## SP 
-# x  is a data.frame 
-# similarity_fun - either one R function or a list of R functions 
-# assume the user passes a well-formed x (vector, matrix, or factor) and the function knows how to handle it.
-# sim_args = list of arguments for the similiarity function. Note that the similarity_fun needs to handle checks    # V x C
-
-
-# Output:
-# Posterior samples of the community labels for each node v=1,...,V
+#' Gibbs sampler for the extended stochastic block model
+#'
+#' Runs a Gibbs sampler for the extended stochastic block model with a Gibbs-type
+#' partition prior and optional covariate-dependent PPMx similarity weights.
+#'
+#' @param Y A \eqn{V \times V} symmetric adjacency matrix.
+#' @param seed Integer seed for reproducibility.
+#' @param N_iter Number of MCMC iterations.
+#' @param prior A list specifying the partition prior. The entry \code{name} must
+#'   be one of \code{"DP"}, \code{"PY"}, \code{"DM"}, or \code{"GN"}. Additional
+#'   entries define the prior-specific hyperparameters; for example,
+#'   \code{list(name = "DP", alpha_PY = 1)},
+#'   \code{list(name = "PY", alpha_PY = 1, sigma_PY = 0.2)},
+#'   \code{list(name = "DM", beta_DM = 1, H_DM = 10)}, or
+#'   \code{list(name = "GN", gamma_GN = 0.3)}.
+#' @param z_init Integer vector of length \eqn{V} giving the initial cluster
+#'   assignment for each node. Defaults to one cluster per node.
+#' @param a,b Hyperparameters of the Beta prior on the block connection
+#'   probabilities.
+#' @param x Optional data frame of node covariates. If provided, \code{nrow(x)}
+#'   must equal \code{nrow(Y)}.
+#' @param similarity_fun Optional similarity function or list of similarity
+#'   functions. If a list is provided, its length must equal \code{ncol(x)}.
+#'   Each function must support two modes: \code{mode = "node"}, returning log
+#'   similarity values for assigning the current node to each existing cluster
+#'   and to a new cluster; and \code{mode = "partition"}, returning log
+#'   similarity values for the clusters in the current partition.
+#' @param sim_args Optional list of additional arguments passed to the similarity
+#'   functions. If multiple similarity functions are used, this should be a list
+#'   of the same length as \code{similarity_fun}.
+#' @param alpha_g Scalar, vector, or list specifying the covariate weights.
+#'   If numeric, \code{alpha_g} is treated as fixed. It may be a scalar, reused
+#'   for all similarity functions, or a vector with one entry per similarity
+#'   function. If a list, \code{alpha_g} is learned within the Gibbs sampler and
+#'   should contain \code{init}, \code{a_alpha}, and \code{b_alpha}. For example,
+#'   \code{list(init = 1, a_alpha = 1, b_alpha = 1)} or
+#'   \code{list(init = c(1,2), a_alpha = c(1,1), b_alpha = c(1,1))}.
+#'
+#' @return A list containing:
+#' \describe{
+#'   \item{\code{z_post}}{A \eqn{V \times N_iter} matrix of posterior samples of
+#'   the cluster labels. Entry \code{z_post[v, t]} is the cluster label of node
+#'   \eqn{v} at iteration \eqn{t}.}
+#'   \item{\code{alpha_g_post}}{A \eqn{J \times N_iter} matrix of sampled
+#'   covariate weights, returned when \code{alpha_g} is specified as a list.}
+#' }
+#'
+#' @details
+#' The argument \code{similarity_fun} is used only for local reassignment
+#' probabilities inside the Gibbs update. If \code{learn_alpha_g = TRUE}, an
+#' additional partition-level similarity evaluation is needed to update
+#' \code{alpha_g}.
+#'
+#' @examples
+#' prior <- list(name = "GN", gamma_GN = 0.3)
+#' fit <- esbm(Y = Y, seed = 1, N_iter = 1000, prior = prior)
 
  
   ## possibile controllo
@@ -54,31 +90,44 @@ urn_GN <- function(v_minus,gamma_GN){
   ## da aggiungere ora un vettore alpha - length(alpha) = length(similarity_fun)
 
 
-esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
-                 alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
-                 x=NULL,
-                 similarity_fun = NULL, 
-                 sim_args = list(), 
-                 alpha_g = 1){
+# esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
+#                  alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
+#                  x=NULL,
+#                  similarity_fun = NULL, 
+#                  sim_args = list(),  
+#                alpha_g = 1){
+
+esbm <- function(Y, seed, N_iter, prior, 
+                 z_init = seq_len(nrow(Y)), 
+                 a = 1, b = 1,
+                 x = NULL, similarity_fun = NULL, sim_args = list(),
+                 alpha_g = 1) {  
  
   # ----------------------------------------------
   # Selection of the prior distribution to be used
   # ----------------------------------------------
   
-  if (prior=="DP"){
-    urn<-function(v_minus){return(urn_DP(v_minus,alpha_PY))}
-  } else if (prior=="PY"){
-    urn<-function(v_minus){return(urn_PY(v_minus,alpha_PY,sigma_PY))}
-  } else if (prior=="DM"){
-    urn<-function(v_minus){return(urn_DM(v_minus,beta_DM,H_DM))}
-  } else if (prior=="GN"){
-    urn<-function(v_minus){return(urn_GN(v_minus,gamma_GN))}
-  } else { 
-    stop("Invalid value for prior")  
+    if (!is.list(prior) || is.null(prior$name)) {
+    stop("prior must be a list with a name field.")
   }
+
+  if (prior$name == "DP") {
+    urn <- function(v_minus) urn_DP(v_minus, prior$alpha_PY)
+  } else if (prior$name == "PY") {
+    urn <- function(v_minus) urn_PY(v_minus, prior$alpha_PY, prior$sigma_PY)
+  } else if (prior$name == "DM") {
+    urn <- function(v_minus) urn_DM(v_minus, prior$beta_DM, prior$H_DM)
+  } else if (prior$name == "GN") {
+    urn <- function(v_minus) urn_GN(v_minus, prior$gamma_GN)
+  } else {
+    stop("Invalid prior$name.")
+  }
+
   
   # ----------------------------------------------
   # SP: checks if covariates have been provided
+  # and if so we check on whether there is a prior
+  # for alpha or not
   # ----------------------------------------------  
   if (!is.null(x)){
     print("Note : covariates have been provided")
@@ -112,16 +161,41 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
       stop("sim_args must have length equal to length(similarity_fun).")
     }
 
-    # alpha_g must be scalar or length J
-    if (length(alpha_g) == 1L) {
-      alpha_g <- rep(alpha_g, J)
-    } else if (length(alpha_g) != J) {
-      stop("alpha_g must be scalar or a vector of length equal to similarity_fun.")
+    ## ----------------------------------------------
+    ## SP: check prior for covariate weights alpha_g
+    ## ----------------------------------------------
+    learn_alpha_g <- is.list(alpha_g)
+
+    if (learn_alpha_g) {
+
+      alpha_g_init <- alpha_g$init
+      a_alpha <- alpha_g$a_alpha
+      b_alpha <- alpha_g$b_alpha
+
+      # recycle scalar hyperparameters
+      if (length(alpha_g_init) == 1L) alpha_g_init <- rep(alpha_g_init, J)
+      if (length(a_alpha) == 1L) a_alpha <- rep(a_alpha, J)
+      if (length(b_alpha) == 1L) b_alpha <- rep(b_alpha, J)
+
+      # basic checks
+      if (length(alpha_g_init) != J) stop("alpha_g$init must have length 1 or J.")
+      if (length(a_alpha) != J) stop("alpha_g$a_alpha must have length 1 or J.")
+      if (length(b_alpha) != J) stop("alpha_g$b_alpha must have length 1 or J.")
+
+      alpha_g <- alpha_g_init
+
+    } else {
+
+      # fixed weights
+      if (length(alpha_g) == 1L) alpha_g <- rep(alpha_g, J)
+
+      if (length(alpha_g) != J) {
+        stop("alpha_g must have length 1 or J.")
+      }
     }
- 
   }
+
   
-    
 
   # ----------------------------------------------
   # Initialization
@@ -143,6 +217,11 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
   # Note: matrix z_post takes less memory than a list of N_iter matrices Z
   z_post <- matrix(NA,V,N_iter)
   
+  # set up speace to save the posterior for alpha if present
+  alpha_g_post <- NULL
+  if (learn_alpha_g) {
+    alpha_g_post <- matrix(NA, nrow = J, ncol = N_iter)
+  }
   
   # Create the matrix with block connections
   temp   <- Y%*%Z
@@ -215,6 +294,7 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
         for (j in seq_len(J)) {
 
           log_g_j <- similarity_fun[[j]](
+            mode = "node",
             Z_minus_v     = Z_v,
             cluster_sizes = v_minus,
             v_index       = v,
@@ -265,14 +345,41 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
       m_full              <- m + resid2
     }
     
+ 
+    # update and store alpha_g if learned
+    if (learn_alpha_g) {
+      for (j in seq_len(J)) {
+        log_g_h <- similarity_fun[[j]](
+          mode = "partition",
+          Z    = Z,
+          x    = x[, j],
+          args = sim_args[[j]]
+        )
+
+        log_g_h <- log_g_h - log(sum(exp(log_g_h)))
+
+        rate_alpha <- b_alpha[j] - sum(log_g_h)
+
+        alpha_g[j] <- rgamma(1, shape = a_alpha[j], rate = rate_alpha)
+      }
+
+      alpha_g_post[, t] <- alpha_g
+    }
+
     # store cluster assignments at time t in matrix z_post s.t.
     # z_post[v,t]=h if node v is in cluster h at iteration t
-    z_post[,t] <- Z %*% c(1:ncol(Z))
+    z_post[, t] <- Z %*% seq_len(ncol(Z))
+
     
     #print(table(z_post[,t])) 
     if (t%%1000 == 0){print(paste("Iteration:", t))}
   }
-  return(z_post)
+
+  return(list(
+    z_post = z_post,
+    alpha_g_post = alpha_g_post
+  ))
+
 }
 
 
@@ -281,314 +388,314 @@ esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
 ## some uses packages and it is not clear which ones
 ####################################################################################
 
-####################################################################################
-# PUT CLUSTER LABELS IN BINARY MATRIX FORM  ########################################
-####################################################################################
+# ####################################################################################
+# # PUT CLUSTER LABELS IN BINARY MATRIX FORM  ########################################
+# ####################################################################################
 
-vec2mat <- function(clust_lab){
-  # in: vector clust_lab of length V s.t. clust_lab[v]=h if node v is in cluster h
-  # out: binary VxH matrix M s.t. M[v,h]=1{node v is in cluster h}
-  V <- length(clust_lab)
-  H <- max(clust_lab)
-  M <- matrix(0,V,H)
-  for (v in 1:V){
-    M[v,clust_lab[v]] <- 1
-  }
-  return(M)
-}
-
-
-
-####################################################################################
-# COMPUTE POSTERIOR CO-CLUSTERING MATRIX  ##########################################
-####################################################################################
+# vec2mat <- function(clust_lab){
+#   # in: vector clust_lab of length V s.t. clust_lab[v]=h if node v is in cluster h
+#   # out: binary VxH matrix M s.t. M[v,h]=1{node v is in cluster h}
+#   V <- length(clust_lab)
+#   H <- max(clust_lab)
+#   M <- matrix(0,V,H)
+#   for (v in 1:V){
+#     M[v,clust_lab[v]] <- 1
+#   }
+#   return(M)
+# }
 
 
 
-pr_cc <- function(z_post){
-  # in: posterior sample of assignments (VxN_iter matrix)
-  # out: VxV matrix c with elements c[vu]=fraction of iterations in which v and u are in the same cluster
-  V <- nrow(z_post)    
-  N_iter <- ncol(z_post)
-  c <- matrix(0,V,V)
-  for (t in 1:N_iter){
-    Z <- vec2mat(z_post[,t])
-    c <- c + Z%*%t(Z)
-  }
-  return(c/N_iter)
-}
-
-####################################################################################
-# COMPUTE MISCLASSIFICATION ERROR  #################################################
-####################################################################################
-
-misclass <- function(memb,Y,a,b){
- # in: vector of cluster labels (memb), VxV adjancency matrix (Y) and hyperparameters beta priors (a,b)
- # out: misclassification error when predicting the edges with the estimated block probabilities
-z <- dummy(memb)
-H <- ncol(z)
-V <- dim(Y)[1]
-Abs_Freq <- t(z)%*%Y%*%z
-diag(Abs_Freq) <- diag(Abs_Freq)/2
-Tot <- t(z)%*%matrix(1,V,V)%*%z
-diag(Tot) <- (diag(Tot)-table(memb))/2
-Rel_Freq <- (a+Abs_Freq)/(a+b+Tot)
-pred <- z%*%Rel_Freq%*%t(z)
-return(1-sum(diag(table(lowerTriangle(Y),lowerTriangle(pred>0.5))))/length(lowerTriangle(Y)))
-}
+# ####################################################################################
+# # COMPUTE POSTERIOR CO-CLUSTERING MATRIX  ##########################################
+# ####################################################################################
 
 
-####################################################################################
-# COMPUTE MATRIX OF ESTIMATED EDGE PROBABILITIES  ##################################
-####################################################################################
 
-edge_est <- function(memb,Y,a,b){
- # in: vector of cluster labels (memb), VxV adjancency matrix (Y) and hyperparameters beta priors (a,b)
- # out: matrix of estimated edge probabilities
-z <- dummy(memb)
-H <- ncol(z)
-V <- dim(Y)[1]
-Abs_Freq <- t(z)%*%Y%*%z
-diag(Abs_Freq) <- diag(Abs_Freq)/2
-Tot <- t(z)%*%matrix(1,V,V)%*%z
-diag(Tot) <- (diag(Tot)-table(memb))/2
-Rel_Freq <- (a+Abs_Freq)/(a+b+Tot)
-edge_matr <- z%*%Rel_Freq%*%t(z)
-diag(edge_matr)<-0
-return(edge_matr)
-}
+# pr_cc <- function(z_post){
+#   # in: posterior sample of assignments (VxN_iter matrix)
+#   # out: VxV matrix c with elements c[vu]=fraction of iterations in which v and u are in the same cluster
+#   V <- nrow(z_post)    
+#   N_iter <- ncol(z_post)
+#   c <- matrix(0,V,V)
+#   for (t in 1:N_iter){
+#     Z <- vec2mat(z_post[,t])
+#     c <- c + Z%*%t(Z)
+#   }
+#   return(c/N_iter)
+# }
 
-####################################################################################
-# COMPUTE LOG MARGINAL LIKELIHOOD  #################################################
-####################################################################################
+# ####################################################################################
+# # COMPUTE MISCLASSIFICATION ERROR  #################################################
+# ####################################################################################
 
-log_pY_z <- function(Y,z,a,b){
-# in: Adjacency matrix Y, one vector of node labels z, hyperparameters (a,b) of Beta priors for block probabilities
-# out: logarithm of the marginal likelihood in eq. [1] evaluated at z.
+# misclass <- function(memb,Y,a,b){
+#  # in: vector of cluster labels (memb), VxV adjancency matrix (Y) and hyperparameters beta priors (a,b)
+#  # out: misclassification error when predicting the edges with the estimated block probabilities
+# z <- dummy(memb)
+# H <- ncol(z)
+# V <- dim(Y)[1]
+# Abs_Freq <- t(z)%*%Y%*%z
+# diag(Abs_Freq) <- diag(Abs_Freq)/2
+# Tot <- t(z)%*%matrix(1,V,V)%*%z
+# diag(Tot) <- (diag(Tot)-table(memb))/2
+# Rel_Freq <- (a+Abs_Freq)/(a+b+Tot)
+# pred <- z%*%Rel_Freq%*%t(z)
+# return(1-sum(diag(table(lowerTriangle(Y),lowerTriangle(pred>0.5))))/length(lowerTriangle(Y)))
+# }
+
+
+# ####################################################################################
+# # COMPUTE MATRIX OF ESTIMATED EDGE PROBABILITIES  ##################################
+# ####################################################################################
+
+# edge_est <- function(memb,Y,a,b){
+#  # in: vector of cluster labels (memb), VxV adjancency matrix (Y) and hyperparameters beta priors (a,b)
+#  # out: matrix of estimated edge probabilities
+# z <- dummy(memb)
+# H <- ncol(z)
+# V <- dim(Y)[1]
+# Abs_Freq <- t(z)%*%Y%*%z
+# diag(Abs_Freq) <- diag(Abs_Freq)/2
+# Tot <- t(z)%*%matrix(1,V,V)%*%z
+# diag(Tot) <- (diag(Tot)-table(memb))/2
+# Rel_Freq <- (a+Abs_Freq)/(a+b+Tot)
+# edge_matr <- z%*%Rel_Freq%*%t(z)
+# diag(edge_matr)<-0
+# return(edge_matr)
+# }
+
+# ####################################################################################
+# # COMPUTE LOG MARGINAL LIKELIHOOD  #################################################
+# ####################################################################################
+
+# log_pY_z <- function(Y,z,a,b){
+# # in: Adjacency matrix Y, one vector of node labels z, hyperparameters (a,b) of Beta priors for block probabilities
+# # out: logarithm of the marginal likelihood in eq. [1] evaluated at z.
   
-  # SP - check for reshape dependency
-  if (!requireNamespace("reshape2", quietly = TRUE)) {
-    stop("Package 'reshape2' is required for this function. Please install it with install.packages('reshape2').")
-  }
+#   # SP - check for reshape dependency
+#   if (!requireNamespace("reshape2", quietly = TRUE)) {
+#     stop("Package 'reshape2' is required for this function. Please install it with install.packages('reshape2').")
+#   }
 
-  H <- length(unique(z))
-  colnames(Y) <- rownames(Y) <- z
+#   H <- length(unique(z))
+#   colnames(Y) <- rownames(Y) <- z
 
-  edge_counts <- reshape2::melt(Y)
+#   edge_counts <- reshape2::melt(Y)
 
-  Y_c <- 1 - Y
-  diag(Y_c) <- 0
-  non_edge_counts <- reshape2::melt(Y_c)
+#   Y_c <- 1 - Y
+#   diag(Y_c) <- 0
+#   non_edge_counts <- reshape2::melt(Y_c)
   	
-  Edge <- matrix(aggregate(edge_counts[,3],by=list(edge_counts[,1],edge_counts[,2]),sum,na.rm=TRUE)[,3],H,H)
-  diag(Edge) <- diag(Edge)/2
+#   Edge <- matrix(aggregate(edge_counts[,3],by=list(edge_counts[,1],edge_counts[,2]),sum,na.rm=TRUE)[,3],H,H)
+#   diag(Edge) <- diag(Edge)/2
 
-  No_Edge <- matrix(aggregate(non_edge_counts[,3],by=list(non_edge_counts[,1],non_edge_counts[,2]),sum,na.rm=TRUE)[,3],H,H)
-  diag(No_Edge) <- diag(No_Edge)/2
+#   No_Edge <- matrix(aggregate(non_edge_counts[,3],by=list(non_edge_counts[,1],non_edge_counts[,2]),sum,na.rm=TRUE)[,3],H,H)
+#   diag(No_Edge) <- diag(No_Edge)/2
 
-  a_n <- lowerTriangle(Edge,diag=TRUE)+a
-  b_bar_n <- lowerTriangle(No_Edge,diag=TRUE)+b
+#   a_n <- lowerTriangle(Edge,diag=TRUE)+a
+#   b_bar_n <- lowerTriangle(No_Edge,diag=TRUE)+b
 
-  return(sum(lbeta(a_n,b_bar_n))-(H*(H+1)/2)*lbeta(a,b))
-}
+#   return(sum(lbeta(a_n,b_bar_n))-(H*(H+1)/2)*lbeta(a,b))
+# }
 
-####################################################################################
-# COMPUTE THE LOG-LIKELIHOOD OF THE EDGES ##########################################
-####################################################################################
+# ####################################################################################
+# # COMPUTE THE LOG-LIKELIHOOD OF THE EDGES ##########################################
+# ####################################################################################
 
-sampleLL <- function(memb,Y,a,b){
-  # in: vector of cluster labels (memb), VxV adjancency matrix (Y) and hyperparameters beta priors (a,b)
-  # out: vector of Bernoulli log-likelihoods for the edges under ESBM (conditioned on memb and on block-probabilities)
+# sampleLL <- function(memb,Y,a,b){
+#   # in: vector of cluster labels (memb), VxV adjancency matrix (Y) and hyperparameters beta priors (a,b)
+#   # out: vector of Bernoulli log-likelihoods for the edges under ESBM (conditioned on memb and on block-probabilities)
   
-  z <- dummy(memb)
-  H <- ncol(z)
-  V <- dim(Y)[1]
+#   z <- dummy(memb)
+#   H <- ncol(z)
+#   V <- dim(Y)[1]
   
-  M <- t(z)%*%Y%*%z
-  diag(M) <- diag(M)/2
-  Tot <- t(z)%*%matrix(1,V,V)%*%z
-  diag(Tot) <- (diag(Tot)-table(memb))/2
-  Mbar <- Tot-M
-  a_n <- lowerTriangle(M,diag=TRUE)+a
-  b_bar_n <- lowerTriangle(Mbar,diag=TRUE)+b
+#   M <- t(z)%*%Y%*%z
+#   diag(M) <- diag(M)/2
+#   Tot <- t(z)%*%matrix(1,V,V)%*%z
+#   diag(Tot) <- (diag(Tot)-table(memb))/2
+#   Mbar <- Tot-M
+#   a_n <- lowerTriangle(M,diag=TRUE)+a
+#   b_bar_n <- lowerTriangle(Mbar,diag=TRUE)+b
   
-  theta <- rbeta(length(a_n),a_n,b_bar_n)
-  Theta <- matrix(0,H,H)
-  Theta[lower.tri(Theta,diag=TRUE)] <- theta
-  Theta <- Theta+t(Theta)
-  diag(Theta) <- diag(Theta)/2
-  edge_prob <- z%*%Theta%*%t(z)
+#   theta <- rbeta(length(a_n),a_n,b_bar_n)
+#   Theta <- matrix(0,H,H)
+#   Theta[lower.tri(Theta,diag=TRUE)] <- theta
+#   Theta <- Theta+t(Theta)
+#   diag(Theta) <- diag(Theta)/2
+#   edge_prob <- z%*%Theta%*%t(z)
   
-  LL <- dbinom(lowerTriangle(Y,diag=FALSE), size=1, prob=lowerTriangle(edge_prob,diag=FALSE),log=TRUE)
+#   LL <- dbinom(lowerTriangle(Y,diag=FALSE), size=1, prob=lowerTriangle(edge_prob,diag=FALSE),log=TRUE)
   
-  return(LL)
-}
+#   return(LL)
+# }
 
-####################################################################################
+# ####################################################################################
 # COMPUTE OUT-OF-SAMPLE CLUSTER PROBABILITIES  #####################################
 ####################################################################################
 
-pred_esbm <- function(Y, prior, z_hat, a=1, b=1,alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA){
+# pred_esbm <- function(Y, prior, z_hat, a=1, b=1,alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA){
 
-#### SP: may need to check this ######
+# #### SP: may need to check this ######
 
-# in: Adjacency matrix Y whose last row and column contain the observed edges for the new node to be classified, one vector of node labels z_hat for the already observed nodes, hyperparameters (a,b) of Beta priors for block probabilities, and prior for the partition process
-# out: full conditional probabilities for the memebership of the new node to the different clusters.
+# # in: Adjacency matrix Y whose last row and column contain the observed edges for the new node to be classified, one vector of node labels z_hat for the already observed nodes, hyperparameters (a,b) of Beta priors for block probabilities, and prior for the partition process
+# # out: full conditional probabilities for the memebership of the new node to the different clusters.
 
 	
-  # ----------------------------------------------
-  # Selection of the prior distribution to be used
-  # ----------------------------------------------
+#   # ----------------------------------------------
+#   # Selection of the prior distribution to be used
+#   # ----------------------------------------------
   
-  if (prior=="DP"){
-    urn<-function(v_minus){return(urn_DP(v_minus,alpha_PY))}
-  } else if (prior=="PY"){
-    urn<-function(v_minus){return(urn_PY(v_minus,alpha_PY,sigma_PY))}
-  } else if (prior=="DM"){
-    urn<-function(v_minus){return(urn_DM(v_minus,beta_DM,H_DM))}
-  } else if (prior=="GN"){
-    urn<-function(v_minus){return(urn_GN(v_minus,gamma_GN))}
-  } else { 
-    stop("Invalid value for prior")  
-  }
+#   if (prior=="DP"){
+#     urn<-function(v_minus){return(urn_DP(v_minus,alpha_PY))}
+#   } else if (prior=="PY"){
+#     urn<-function(v_minus){return(urn_PY(v_minus,alpha_PY,sigma_PY))}
+#   } else if (prior=="DM"){
+#     urn<-function(v_minus){return(urn_DM(v_minus,beta_DM,H_DM))}
+#   } else if (prior=="GN"){
+#     urn<-function(v_minus){return(urn_GN(v_minus,gamma_GN))}
+#   } else { 
+#     stop("Invalid value for prior")  
+#   }
   
-  # ----------------------------------------------
-  # Initialization
-  # ----------------------------------------------
+#   # ----------------------------------------------
+#   # Initialization
+#   # ----------------------------------------------
     
-  V <- nrow(Y)
-  z_init <- c(z_hat,max(z_hat)+1)
+#   V <- nrow(Y)
+#   z_init <- c(z_hat,max(z_hat)+1)
    
-  # cluster assignments are encoded in two equivalent ways:
-  # [i] a VxH matrix Z, s.t. Z[v,h]=1{node v in cluster h}, faster to use within each iteration
-  Z <- vec2mat(z_init)  
+#   # cluster assignments are encoded in two equivalent ways:
+#   # [i] a VxH matrix Z, s.t. Z[v,h]=1{node v in cluster h}, faster to use within each iteration
+#   Z <- vec2mat(z_init)  
   
-  # Create the matrix with block connections
-  temp   <- Y%*%Z
-  m_full <- t(Z)%*%temp - diag(0.5*colSums(temp*Z),ncol(Z))
+#   # Create the matrix with block connections
+#   temp   <- Y%*%Z
+#   m_full <- t(Z)%*%temp - diag(0.5*colSums(temp*Z),ncol(Z))
   
-  # ----------------------------------------------
-  # Predictive
-  # ----------------------------------------------
+#   # ----------------------------------------------
+#   # Predictive
+#   # ----------------------------------------------
     
-  v <- V
+#   v <- V
   
-   # remove empty clusters and
-      # if the cluster containing node v has no other node, discard it as well
-      if(ncol(Z) > 1){
-        nonempty_v <- which(colSums(Z[-v,]) > 0)  
-        Z <- Z[, nonempty_v]
-        if (length(nonempty_v)==1){Z <- matrix(Z,V,1)}
+#    # remove empty clusters and
+#       # if the cluster containing node v has no other node, discard it as well
+#       if(ncol(Z) > 1){
+#         nonempty_v <- which(colSums(Z[-v,]) > 0)  
+#         Z <- Z[, nonempty_v]
+#         if (length(nonempty_v)==1){Z <- matrix(Z,V,1)}
         
-        # Reduce the dimensions of the m_full matrix
-        m_full <- matrix(m_full[nonempty_v,nonempty_v],ncol(Z),ncol(Z))
-      } 
+#         # Reduce the dimensions of the m_full matrix
+#         m_full <- matrix(m_full[nonempty_v,nonempty_v],ncol(Z),ncol(Z))
+#       } 
       
-      # H = number of active clusters
-      H   <- ncol(Z)
-      Z_v <- Z[-v,]
+#       # H = number of active clusters
+#       H   <- ncol(Z)
+#       Z_v <- Z[-v,]
       
-      # v_minus = number of nodes in each cluster, excluding node v
-      if (H==1){v_minus <- sum(Z[-v])} else {v_minus <- colSums(Z_v)}
+#       # v_minus = number of nodes in each cluster, excluding node v
+#       if (H==1){v_minus <- sum(Z[-v])} else {v_minus <- colSums(Z_v)}
       
-      # r_v = number of edges from node v to each cluster (no self-loops)
-      r_v         <- crossprod(Z_v, Y[-v,v])
-      h_v         <- which(Z[v,] > 0)
+#       # r_v = number of edges from node v to each cluster (no self-loops)
+#       r_v         <- crossprod(Z_v, Y[-v,v])
+#       h_v         <- which(Z[v,] > 0)
       
-      # Compute the m matrix by difference
-      if(length(h_v) == 1){
-        resid1       <- matrix(0,H,H)
-        resid1[,h_v] <- r_v; resid1[h_v,] <- r_v
-        m            <- m_full - resid1
-      } else {m <- m_full} # No need to update m in this case
+#       # Compute the m matrix by difference
+#       if(length(h_v) == 1){
+#         resid1       <- matrix(0,H,H)
+#         resid1[,h_v] <- r_v; resid1[h_v,] <- r_v
+#         m            <- m_full - resid1
+#       } else {m <- m_full} # No need to update m in this case
       
-      # m_bar = number of non-edges between cluster h and cluster k, excluding node v 
-      m_bar   <- matrix(v_minus,H,1)%*%matrix(v_minus,1,H) - diag(0.5*v_minus*(v_minus+1),H) - m
-      V_minus <- matrix(1,H,1)%*%matrix(v_minus,1,H)
-      R       <- matrix(1,H,1)%*%matrix(r_v,1,H)
+#       # m_bar = number of non-edges between cluster h and cluster k, excluding node v 
+#       m_bar   <- matrix(v_minus,H,1)%*%matrix(v_minus,1,H) - diag(0.5*v_minus*(v_minus+1),H) - m
+#       V_minus <- matrix(1,H,1)%*%matrix(v_minus,1,H)
+#       R       <- matrix(1,H,1)%*%matrix(r_v,1,H)
       
-      # ----------------------------------------------
-      # Computing the probabilities
-      # ----------------------------------------------
+#       # ----------------------------------------------
+#       # Computing the probabilities
+#       # ----------------------------------------------
       
-      log_lhds_old <- rowSums(lbeta(m + R + a, m_bar + V_minus - R + b) - lbeta(m + a, m_bar + b)) # vector of length H
-      log_lhd_new  <- sum(lbeta(r_v + a, v_minus - r_v + b) - lbeta(a, b)) # scalar
-      log_similarity_g    <- 0  
+#       log_lhds_old <- rowSums(lbeta(m + R + a, m_bar + V_minus - R + b) - lbeta(m + a, m_bar + b)) # vector of length H
+#       log_lhd_new  <- sum(lbeta(r_v + a, v_minus - r_v + b) - lbeta(a, b)) # scalar
+#       log_similarity_g    <- 0  
   
-      log_p <- log_similarity_g + log(urn(v_minus)) + c(log_lhds_old, log_lhd_new)
-      p     <- exp(log_p - max(log_p)); 
+#       log_p <- log_similarity_g + log(urn(v_minus)) + c(log_lhds_old, log_lhd_new)
+#       p     <- exp(log_p - max(log_p)); 
             
-      return(p)
-}
+#       return(p)
+# }
 
 
 
-####################################################################################
-# COMPUTE THE DISTRIBUTION OF H AND THE EXPECTED VALUE UNDER VARIOUS GIBBS TYPE ####
-####################################################################################
+# ####################################################################################
+# # COMPUTE THE DISTRIBUTION OF H AND THE EXPECTED VALUE UNDER VARIOUS GIBBS TYPE ####
+# ####################################################################################
 
-expected_cl_py <- function(n, sigma, theta, H){
-  n <- as.integer(n)
-  stopifnot(sigma >= 0, sigma < 1, theta > - sigma, n > 0, H > 1)
-  if(H == Inf){
-    if(sigma==0) {
-    out <- theta * sum(1/(theta - 1 + 1:n))
-    } else {
-    out <- 1/sigma*exp(lgamma(theta + sigma + n) - lgamma(theta + sigma) - lgamma(theta + n) + lgamma(theta + 1)) - theta/sigma
-    }
-  } else if(H < Inf){
-    if(sigma==0) {
-      index <- 0:(n-1)
-      out <- H - H*exp(sum(log(index + theta*(1 - 1/H)) - log(theta+ index)))
-    }
-  }
-  return(out)
-}
+# expected_cl_py <- function(n, sigma, theta, H){
+#   n <- as.integer(n)
+#   stopifnot(sigma >= 0, sigma < 1, theta > - sigma, n > 0, H > 1)
+#   if(H == Inf){
+#     if(sigma==0) {
+#     out <- theta * sum(1/(theta - 1 + 1:n))
+#     } else {
+#     out <- 1/sigma*exp(lgamma(theta + sigma + n) - lgamma(theta + sigma) - lgamma(theta + n) + lgamma(theta + 1)) - theta/sigma
+#     }
+#   } else if(H < Inf){
+#     if(sigma==0) {
+#       index <- 0:(n-1)
+#       out <- H - H*exp(sum(log(index + theta*(1 - 1/H)) - log(theta+ index)))
+#     }
+#   }
+#   return(out)
+# }
 
 
-# ----------------------------------------------
-# INTERNAL USAGE ONLY
-# ----------------------------------------------
+# # ----------------------------------------------
+# # INTERNAL USAGE ONLY
+# # ----------------------------------------------
 
-lV_py <- function(n, k, sigma, theta){
-  if(k==1) return(lgamma(theta + 1) - lgamma(theta + n))
-  index <- 1:(k-1)
-  sum(log(theta + index*sigma)) + lgamma(theta + 1) - lgamma(theta + n)
-}
+# lV_py <- function(n, k, sigma, theta){
+#   if(k==1) return(lgamma(theta + 1) - lgamma(theta + n))
+#   index <- 1:(k-1)
+#   sum(log(theta + index*sigma)) + lgamma(theta + 1) - lgamma(theta + n)
+# }
 
-# ----------------------------------------------
-# INTERNAL USAGE ONLY
-# ----------------------------------------------
+# # ----------------------------------------------
+# # INTERNAL USAGE ONLY
+# # ----------------------------------------------
 
-lV_py <- Vectorize(lV_py, vectorize.args = "k")
+# lV_py <- Vectorize(lV_py, vectorize.args = "k")
 
-dclust_py <- function(n, sigma, theta, H, log_scale=FALSE){
+# dclust_py <- function(n, sigma, theta, H, log_scale=FALSE){
   
-  probs <- numeric(n) - Inf
-  if(H == Inf){
-    index <- 1:n
-    if(sigma > 0) {
-      probs  <- c(lgfactorial(n, sigma)) - index*log(sigma) + lV_py(n,index,sigma,theta)
-    } else {
-      probs  <- c(lastirling1(n)) + lV_py(n,index,sigma,theta)
-    }
-  }
-  if(H < Inf){
-    index <- 1:min(n,H)
-    if(sigma == 0){
-      probs[index]  <- lfactorial(H) - lfactorial(H-index) + c(lgfactorial_ns(n,-theta/H))[index] + lgamma(theta) - lgamma(theta + n)
-    }
-  }
-  if(log_scale) return(probs)
-  return(exp(probs))
-}
+#   probs <- numeric(n) - Inf
+#   if(H == Inf){
+#     index <- 1:n
+#     if(sigma > 0) {
+#       probs  <- c(lgfactorial(n, sigma)) - index*log(sigma) + lV_py(n,index,sigma,theta)
+#     } else {
+#       probs  <- c(lastirling1(n)) + lV_py(n,index,sigma,theta)
+#     }
+#   }
+#   if(H < Inf){
+#     index <- 1:min(n,H)
+#     if(sigma == 0){
+#       probs[index]  <- lfactorial(H) - lfactorial(H-index) + c(lgfactorial_ns(n,-theta/H))[index] + lgamma(theta) - lgamma(theta + n)
+#     }
+#   }
+#   if(log_scale) return(probs)
+#   return(exp(probs))
+# }
 
 
-# ----------------------------------------------
-# GNEDIN
-# ----------------------------------------------
+# # ----------------------------------------------
+# # GNEDIN
+# # ----------------------------------------------
 
-HGnedin <- function(V, h, gamma=0.5){
-  exp(lchoose(V, h) + lgamma(h-gamma) - lgamma(1-gamma) + log(gamma) + lgamma(V+ gamma - h) - lgamma(V +gamma))
-}
+# HGnedin <- function(V, h, gamma=0.5){
+#   exp(lchoose(V, h) + lgamma(h-gamma) - lgamma(1-gamma) + log(gamma) + lgamma(V+ gamma - h) - lgamma(V +gamma))
+# }
 
