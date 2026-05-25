@@ -124,12 +124,14 @@ Z_post <- esbm(
   Y         = Y,
   seed      = seed,
   N_iter    = N_iter,
-  prior     = "DM",
+  prior  = list(
+    name    = "DM",
+    beta_DM = beta_dm,
+    H_DM    = H_dm
+  ),
   z_init    = sample(1:4, nrow(Y), replace = TRUE),
   a         = a,
   b         = b,
-  beta_DM   = beta_dm,
-  H_DM      = H_dm,
   x         = x_df,
   similarity_fun = similarity_fun,
   sim_args       = sim_args,

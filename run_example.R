@@ -9,13 +9,17 @@ source(here("R_utilities/similarity_functions.R"))
 source(here("R_utilities/esbm.R"))
 
 fit <- esbm(
-  Y       = Y,
-  seed    = 1,
-  N_iter  = 2000,
-  prior   = "DM",
-  x       = x,
+  Y      = Y,
+  seed   = 1,
+  N_iter = 2000,
+  prior  = list(
+    name    = "DM",
+    beta_DM = 1,
+    H_DM    = 10
+  ),
+  x = x,
   similarity_fun = sim_normal_aux,
-  sim_args = list(alpha = 1)
+  sim_args =  list(alpha = 1))
 )
 
 str(fit)
