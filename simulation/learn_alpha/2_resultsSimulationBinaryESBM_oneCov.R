@@ -159,26 +159,29 @@ saveRDS(combined_mis_shift, file.path(out_dir, "scenario_1cov_mislead_shifted_re
 
 ####
 
-f <- files_info[1]
-res <- readRDS(f)
-alpha_post  <- res$mcmcpost$alpha_g
-alpha_post  <- res$mcmcpost$alpha_g_post
+# f <- files_info[2]
+# ff <- readRDS(f)
+# rate_post <- as.numeric(ff$mcmcpost$alpha_rate_post)
 
-library(ggplot2)
+# df_rate <- data.frame(
+#   iter = seq_along(rate_post),
+#   rate = rate_post
+# )
 
-df_trace <- data.frame(
-  iter = seq_along(alpha_post),
-  alpha = alpha_post
-)
+# library(ggplot2)
 
-ggplot(df_trace, aes(x = iter, y = alpha)) +
-  geom_line(alpha = 0.7) +
-  theme_minimal(base_size = 14) +
-  labs(
-    title = expression("Trace plot for " ~ alpha[g]),
-    x = "Iteration",
-    y = expression(alpha[g])
-  )
+# p_rate <- ggplot(df_rate,
+#                  aes(x = iter, y = rate)) +
+#   geom_line(alpha = 0.7) +
+#   theme_minimal(base_size = 14) +
+#   labs(
+#     title = expression("Gamma rate parameter for " ~ alpha[g]),
+#     x = "Iteration",
+#     y = "Rate"
+#   ) +
+#   theme(
+#     plot.title = element_text(face = "bold")
+#   )
 
-
+# p_rate
 
