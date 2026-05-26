@@ -172,6 +172,7 @@ esbm <- function(Y, seed, N_iter, prior,
       a_alpha <- alpha_g$a_alpha
       b_alpha <- alpha_g$b_alpha
 
+
       # recycle scalar hyperparameters
       if (length(alpha_g_init) == 1L) alpha_g_init <- rep(alpha_g_init, J)
       if (length(a_alpha) == 1L) a_alpha <- rep(a_alpha, J)
@@ -221,6 +222,9 @@ esbm <- function(Y, seed, N_iter, prior,
   alpha_g_post <- NULL
   if (learn_alpha_g) {
     alpha_g_post <- matrix(NA, nrow = J, ncol = N_iter)
+
+    ### TMP for diagnostic
+    alpha_rate_post <- matrix(NA, nrow = J, ncol = N_iter)
   }
   
   # Create the matrix with block connections
@@ -359,7 +363,8 @@ esbm <- function(Y, seed, N_iter, prior,
         log_g_h <- log_g_h - log(sum(exp(log_g_h)))
 
         rate_alpha <- b_alpha[j] - sum(log_g_h)
-
+        alpha_rate_post[j, t] <- rate_alpha
+        
         alpha_g[j] <- rgamma(1, shape = a_alpha[j], rate = rate_alpha)
       }
 
