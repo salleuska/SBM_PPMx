@@ -101,7 +101,8 @@ esbm <- function(Y, seed, N_iter, prior,
                  z_init = seq_len(nrow(Y)), 
                  a = 1, b = 1,
                  x = NULL, similarity_fun = NULL, sim_args = list(),
-                 alpha_g = 1) {  
+                 alpha_g = 1, 
+                 similarity_calibration = c("normalized", "geometric")) {  
  
   # ----------------------------------------------
   # Selection of the prior distribution to be used
@@ -162,8 +163,13 @@ esbm <- function(Y, seed, N_iter, prior,
     }
 
     ## ----------------------------------------------
+    ## check similarity calibration
+    similarity_calibration <- match.arg(similarity_calibration)
+
+    ## ----------------------------------------------
     ## SP: check prior for covariate weights alpha_g
     ## ----------------------------------------------
+    
     learn_alpha_g <- is.list(alpha_g)
 
     if (learn_alpha_g) {
@@ -287,11 +293,13 @@ esbm <- function(Y, seed, N_iter, prior,
       # log-weights for H existing + 1 new cluster
       # covariates weighted with alpha
       # ----------------------------------------------
+ 
       if (is.null(similarity_fun)) {
 
         log_similarity_g <- rep(0, H + 1)
 
       } else {
+
         # initialize combined log g
         log_similarity_g <- rep(0, H + 1)
 
@@ -304,22 +312,26 @@ esbm <- function(Y, seed, N_iter, prior,
             cluster_sizes = v_minus,
             v_index       = v,
             H             = H,
-            x             = x[, j],        # one column per similarity
+            x             = x[, j],
             args          = sim_args[[j]]
           )
 
-      ## ----------------------------------------------
-          ## add covariate similarity on the log scale
-          ## the division by J gives the geometric average across covariates
-          # log_similarity_g <- log_similarity_g + (alpha_g[j] * log_g_j / J)
-      ##----------------------------------------------
+          if (similarity_calibration == "normalized") {
 
-          # --- normalize g_j across clusters ---
-          lse_j     <- log(sum(exp(log_g_j)))          # log(sum exp(log g_j))
-          log_g_j_n <- log_g_j - lse_j                 # log normalized g_j
+            lse_j <- max(log_g_j) +
+              log(sum(exp(log_g_j - max(log_g_j))))
 
-          # add covariate similarity, weighted by alpha_g[j]
-          log_similarity_g <- log_similarity_g + (alpha_g[j] * log_g_j_n)
+            log_g_j <- log_g_j - lse_j
+
+            log_similarity_g <-
+              log_similarity_g + alpha_g[j] * log_g_j
+
+          } else if (similarity_calibration == "geometric") {
+
+            # geometric averaging across covariates
+            log_similarity_g <-
+              log_similarity_g + alpha_g[j] * log_g_j / J
+          }
         }
       }
      
@@ -360,7 +372,9 @@ esbm <- function(Y, seed, N_iter, prior,
  
     # update and store alpha_g if learned
     if (learn_alpha_g) {
+
       for (j in seq_len(J)) {
+
         log_g_h <- similarity_fun[[j]](
           mode = "partition",
           Z    = Z,
@@ -368,16 +382,32 @@ esbm <- function(Y, seed, N_iter, prior,
           args = sim_args[[j]]
         )
 
-        log_g_h <- log_g_h - log(sum(exp(log_g_h)))
+        if (similarity_calibration == "normalized") {
 
-        rate_alpha <- b_alpha[j] - sum(log_g_h)
+          lse <- max(log_g_h) +
+            log(sum(exp(log_g_h - max(log_g_h))))
+
+          log_g_h <- log_g_h - lse
+
+          rate_alpha <- b_alpha[j] - sum(log_g_h)
+
+        } else if (similarity_calibration == "geometric") {
+
+          rate_alpha <- b_alpha[j] - sum(log_g_h) / J
+        }
+
         alpha_rate_post[j, t] <- rate_alpha
-        
-        alpha_g[j] <- rgamma(1, shape = a_alpha[j], rate = rate_alpha)
+
+        alpha_g[j] <- rgamma(
+          1,
+          shape = a_alpha[j],
+          rate = rate_alpha
+        )
       }
 
       alpha_g_post[, t] <- alpha_g
     }
+
 
     # store cluster assignments at time t in matrix z_post s.t.
     # z_post[v,t]=h if node v is in cluster h at iteration t
