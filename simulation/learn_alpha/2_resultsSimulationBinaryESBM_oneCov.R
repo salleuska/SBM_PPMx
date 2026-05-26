@@ -155,3 +155,30 @@ saveRDS(combined_neutral,   file.path(out_dir, "scenario_1cov_neutral_results.rd
 saveRDS(combined_info,      file.path(out_dir, "scenario_1cov_informative_results.rds"))
 saveRDS(combined_mis_rand,  file.path(out_dir, "scenario_1cov_mislead_random_results.rds"))
 saveRDS(combined_mis_shift, file.path(out_dir, "scenario_1cov_mislead_shifted_results.rds"))
+
+
+####
+
+f <- files_info[1]
+res <- readRDS(f)
+alpha_post  <- res$mcmcpost$alpha_g
+alpha_post  <- res$mcmcpost$alpha_g_post
+
+library(ggplot2)
+
+df_trace <- data.frame(
+  iter = seq_along(alpha_post),
+  alpha = alpha_post
+)
+
+ggplot(df_trace, aes(x = iter, y = alpha)) +
+  geom_line(alpha = 0.7) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = expression("Trace plot for " ~ alpha[g]),
+    x = "Iteration",
+    y = expression(alpha[g])
+  )
+
+
+

@@ -94,33 +94,79 @@ p_alpha <- ggplot(df, aes(x = scenario, y = alpha_mean, color = prior)) +
     legend.title = element_blank()
   )
 
-
+p_alpha
 
 ggsave(file.path(outDir, "posterior_alpha_1cov.pdf"), p_alpha, width = 7, height = 4)
-
-p_ari <- ggplot(df, aes(x = scenario, y = ARI_vi, color = prior)) +
+p_ari <- ggplot(df, aes(x = scenario, y = ARI_mean, color = prior)) +
   geom_point(position = position_dodge(width = 0.5), size = 2.5) +
+  geom_errorbar(
+    aes(ymin = ARI_mean - ARI_sd, ymax = ARI_mean + ARI_sd),
+    position = position_dodge(width = 0.5),
+    width = 0.2,
+    alpha = 0.7
+  ) +
   theme_minimal(base_size = 14) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
   labs(
-    title = "ARI of VI estimate under learned alpha",
+    title = "Posterior mean ARI under learned alpha",
     x = NULL,
-    y = expression(ARI(hat(z), z[0]))
+    y = expression(E(ARI(z, z[0]) ~ "|" ~ data))
   ) +
   theme(
     plot.title = element_text(face = "bold"),
     legend.title = element_blank()
   )
 
-ggsave(file.path(outDir, "ARI_learnedAlpha_1cov.pdf"), p_ari, width = 7, height = 4)
+ggsave(file.path(outDir, "ARI_mean_withSD_learnedAlpha_1cov.pdf"), p_ari, width = 7, height = 4)
 
 trace_df <- function(obj, scenario, result_name) {
+
   r <- obj$results[[result_name]]
+
   data.frame(
-    iter = seq_along(as.numeric(r$alpha_keep)),
-    alpha = as.numeric(r$alpha_keep),
-    scenario = scenario,
-    prior = paste0("Gamma(", r$alpha_g$a_alpha, ",", r$alpha_g$b_alpha, ")"),
-    seed = r$seed
+    iter = seq_along(r$alpha_post),
+    alpha = as.numeric(r$alpha_post),
+    scenario = scenario
   )
 }
+
+trace_dat <- rbind(
+  trace_df(
+    res_neutral,
+    "neutral",
+    names(res_neutral$results)[1]
+  ),
+  trace_df(
+    res_info,
+    "informative",
+    names(res_info$results)[1]
+  ),
+  trace_df(
+    res_mis_rand,
+    "mislead_random",
+    names(res_mis_rand$results)[1]
+  )
+)
+
+p_trace <- ggplot(trace_dat,
+                  aes(x = iter, y = alpha, color = scenario)) +
+  geom_line(alpha = 0.7) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Trace plots for learned alpha",
+    x = "Iteration",
+    y = expression(alpha[g])
+  ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.title = element_blank()
+  )
+
+p_trace
+
+ggsave(
+  file.path(outDir, "trace_alpha_1cov.pdf"),
+  p_trace,
+  width = 7,
+  height = 4
+)

@@ -220,6 +220,7 @@ esbm <- function(Y, seed, N_iter, prior,
   
   # set up speace to save the posterior for alpha if present
   alpha_g_post <- NULL
+  alpha_rate_post <- NULL
   if (learn_alpha_g) {
     alpha_g_post <- matrix(NA, nrow = J, ncol = N_iter)
 
@@ -306,6 +307,13 @@ esbm <- function(Y, seed, N_iter, prior,
             x             = x[, j],        # one column per similarity
             args          = sim_args[[j]]
           )
+
+      ## ----------------------------------------------
+          ## add covariate similarity on the log scale
+          ## the division by J gives the geometric average across covariates
+          # log_similarity_g <- log_similarity_g + (alpha_g[j] * log_g_j / J)
+      ##----------------------------------------------
+
           # --- normalize g_j across clusters ---
           lse_j     <- log(sum(exp(log_g_j)))          # log(sum exp(log g_j))
           log_g_j_n <- log_g_j - lse_j                 # log normalized g_j
@@ -382,7 +390,8 @@ esbm <- function(Y, seed, N_iter, prior,
 
   return(list(
     z_post = z_post,
-    alpha_g_post = alpha_g_post
+    alpha_g_post = alpha_g_post, 
+    alpha_rate_post = alpha_rate_post
   ))
 
 }
