@@ -15,8 +15,11 @@ library(cluster)    # to compute silhouette
 ## Settings
 ##---------------------------##
 
+similarity_calibration <- "geometric"
+# similarity_calibration <- "normalized"
+
 ## Paths to results directory and simulation files
-results_dir <- here("simulation", "learn_alpha", "results", "oneCov")
+results_dir <- here("simulation", "learn_alpha", similarity_calibration, "results", "oneCov")
 sim_path_neutral   <- here("simulation", "data", "binarySBM_1cov_neutral.rds")
 sim_path_info      <- here("simulation", "data", "binarySBM_1cov_informative.rds")
 sim_path_mis_rand  <- here("simulation", "data", "binarySBM_1cov_mislead_random.rds")
@@ -92,9 +95,19 @@ res_for_scenario <- function(sim_path, scenario_files) {
 
     alpha_post <- res$mcmcpost$alpha_g_post
 
-    if (!is.null(alpha_post)) {
-      alpha_keep <- alpha_post[, keep_i, drop = FALSE]
+    ## ignore burn in here
+    alpha_post <- res$mcmcpost$alpha_g_post
 
+    alpha_keep <- NULL
+    if (!is.null(alpha_post)) {
+      alpha_keep <- alpha_post
+    }
+
+    alpha_rate_post <- res$mcmcpost$alpha_rate_post
+
+    alpha_rate_keep <- NULL
+    if (!is.null(alpha_rate_post)) {
+      alpha_rate_keep <- alpha_rate_post
     }
     ## PSM
     psm_mat <- psm(t(Z_keep))
@@ -119,17 +132,18 @@ res_for_scenario <- function(sim_path, scenario_files) {
     sil_mean <- mean(sil_obj[, 3])
 
     combined$results[[tag]] <- list(
-      alpha_g     = alpha_g,
-      alpha_post  = alpha_keep, 
-      Z_post      = Z_keep,
-      z_hat       = as.integer(z_hat),
-      ARI_vi      = ARI_vi,        # ARI of VI estimate
-      ARI_mean    = ARI_mean,      # posterior mean ARI
-      ARI_sd      = ARI_sd,        # posterior sd ARI
-      silhouette  = list(object = sil_obj, mean = sil_mean),
-      psm         = psm_mat,
-      seed        = seed,
-      N_iter      = N_iter
+      alpha_g         = alpha_g,
+      alpha_post      = alpha_keep,
+      alpha_rate_post = alpha_rate_keep,
+      Z_post          = Z_keep,
+      z_hat           = as.integer(z_hat),
+      ARI_vi          = ARI_vi,
+      ARI_mean        = ARI_mean,
+      ARI_sd          = ARI_sd,
+      silhouette      = list(object = sil_obj, mean = sil_mean),
+      psm             = psm_mat,
+      seed            = seed,
+      N_iter          = N_iter
     )
   }
 
@@ -140,7 +154,9 @@ res_for_scenario <- function(sim_path, scenario_files) {
 ##---------------------------------------------------------##
 ## Build res & save for seach scenarion
 ##---------------------------------------------------------##
-out_dir <- here("simulation", "learn_alpha", "results", "processed", "oneCov")
+out_dir <- here("simulation", "learn_alpha", 
+                similarity_calibration, 
+                "results", "processed", "oneCov")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 ##---------------------------------------------------------##

@@ -14,25 +14,31 @@ library(here)
 ################################
 ## output directory
 ################################
+similarity_calibration <- "geometric"
+# similarity_calibration <- "normalized"
 
-outDir <- here("simulation", "learn_alpha", "results", "processed", "twoCov")
+outDir <- here("simulation", "learn_alpha", similarity_calibration, "results", "processed", "twoCov")
 dir.create(outDir, recursive = TRUE, showWarnings = FALSE)
+
 
 ################################
 ## read processed results
 ################################
 
-res_NN <- readRDS(here("simulation", "learn_alpha", "results", "processed", "twoCov",
-                      "scenario_2cov_NN_results.rds"))
+res_NN <- readRDS(here("simulation", "learn_alpha", 
+                        similarity_calibration, "results", 
+                        "processed", "twoCov", "scenario_2cov_NN_results.rds"))
+res_IN <- readRDS(here("simulation", "learn_alpha", 
+                        similarity_calibration, "results", 
+                        "processed", "twoCov", "scenario_2cov_IN_results.rds"))
+res_NI <- readRDS(here("simulation", "learn_alpha", 
+                        similarity_calibration, "results", 
+                        "processed", "twoCov", "scenario_2cov_NI_results.rds"))
+res_II <- readRDS(here("simulation", "learn_alpha", 
+                        similarity_calibration, "results", 
+                        "processed", "twoCov", "scenario_2cov_II_results.rds"))
 
-res_IN <- readRDS(here("simulation", "learn_alpha", "results", "processed", "twoCov",
-                      "scenario_2cov_IN_results.rds"))
 
-res_NI <- readRDS(here("simulation", "learn_alpha", "results", "processed", "twoCov",
-                      "scenario_2cov_NI_results.rds"))
-
-res_II <- readRDS(here("simulation", "learn_alpha", "results", "processed", "twoCov",
-                      "scenario_2cov_II_results.rds"))
 
 ################################
 ## extract summaries
@@ -149,55 +155,54 @@ ggsave(
 ################################
 ## trace plots
 ################################
-
-trace_df <- function(obj, scenario, result_name) {
+make_trace_df <- function(obj, scenario, result_name) {
   r <- obj$results[[result_name]]
 
-  rbind(
+  out <- do.call(rbind, lapply(1:2, function(j) {
+    alpha <- as.numeric(r$alpha_post[j, ])
+    rate  <- as.numeric(r$alpha_rate_post[j, ])
+    b_alpha <- r$alpha_g$b_alpha[j]
+
     data.frame(
-      iter = seq_along(r$alpha_post[1, ]),
-      alpha = as.numeric(r$alpha_post[1, ]),
+      iter = seq_along(alpha),
+      alpha = alpha,
+      similarity = rate - b_alpha,
       scenario = scenario,
-      covariate = "x1"
-    ),
-    data.frame(
-      iter = seq_along(r$alpha_post[2, ]),
-      alpha = as.numeric(r$alpha_post[2, ]),
-      scenario = scenario,
-      covariate = "x2"
+      covariate = paste0("x", j)
     )
-  )
+  }))
+
+  out
 }
 
-trace_dat <- rbind(
-  trace_df(res_NN, "NN", names(res_NN$results)[1]),
-  trace_df(res_IN, "IN", names(res_IN$results)[1]),
-  trace_df(res_NI, "NI", names(res_NI$results)[1]),
-  trace_df(res_II, "II", names(res_II$results)[1])
-)
+plot_trace_pair <- function(obj, scenario, result_name, outDir) {
+  dat <- make_trace_df(obj, scenario, result_name)
 
-trace_dat$scenario <- factor(trace_dat$scenario, levels = c("NN", "IN", "NI", "II"))
-trace_dat$covariate <- factor(trace_dat$covariate, levels = c("x1", "x2"))
+  dat$alpha_rm <- ave(dat$alpha, dat$covariate, FUN = function(x) cumsum(x) / seq_along(x))
+  dat$sim_rm <- ave(dat$similarity, dat$covariate, FUN = function(x) cumsum(x) / seq_along(x))
 
-p_trace <- ggplot(trace_dat, aes(x = iter, y = alpha, color = covariate)) +
-  geom_line(alpha = 0.7) +
-  facet_wrap(~ scenario) +
-  theme_minimal(base_size = 14) +
-  labs(
-    title = "Trace plots for learned alpha",
-    x = "Iteration",
-    y = expression(alpha[g])
-  ) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    legend.title = element_blank()
-  )
+  p_alpha <- ggplot(dat, aes(iter, color = covariate)) +
+    geom_line(aes(y = alpha), alpha = 0.35, linewidth = 0.3) +
+    geom_line(aes(y = alpha_rm), linewidth = 1) +
+    facet_wrap(~ covariate, ncol = 1, scales = "free_y") +
+    theme_minimal(base_size = 14) +
+    labs(title = paste("Alpha -", scenario), x = NULL, y = expression(alpha[g])) +
+    theme(plot.title = element_text(face = "bold"), legend.position = "none")
 
-p_trace
+  p_sim <- ggplot(dat, aes(iter, color = covariate)) +
+    geom_line(aes(y = similarity), alpha = 0.35, linewidth = 0.3) +
+    geom_line(aes(y = sim_rm), linewidth = 1) +
+    facet_wrap(~ covariate, ncol = 1, scales = "free_y") +
+    theme_minimal(base_size = 14) +
+    labs(title = paste("Similarity statistic -", scenario), x = "Iteration", y = "Similarity") +
+    theme(plot.title = element_text(face = "bold"), legend.position = "none")
 
-ggsave(
-  file.path(outDir, "trace_alpha_2cov.pdf"),
-  p_trace,
-  width = 8,
-  height = 5
-)
+  p <- cowplot::plot_grid(p_alpha, p_sim, ncol = 1, align = "v")
+
+  ggsave(file.path(outDir, paste0("trace_alpha_similarity_", scenario, "_", result_name, ".pdf")), p, width = 7, height = 10)
+}
+
+for (nm in names(res_NN$results)) plot_trace_pair(res_NN, "NN", nm, outDir)
+for (nm in names(res_IN$results)) plot_trace_pair(res_IN, "IN", nm, outDir)
+for (nm in names(res_NI$results)) plot_trace_pair(res_NI, "NI", nm, outDir)
+for (nm in names(res_II$results)) plot_trace_pair(res_II, "II", nm, outDir)

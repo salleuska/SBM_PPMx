@@ -27,9 +27,17 @@ alpha_init <- if (is.null(args$alpha_init)) 2 else as.numeric(args$alpha_init)
 a_alpha    <- if (is.null(args$a_alpha)) 1 else as.numeric(args$a_alpha)
 b_alpha    <- if (is.null(args$b_alpha)) 1 else as.numeric(args$b_alpha)
 
+similarity_calibration <- if (is.null(args$similarity_calibration)) {
+  "normalized"
+} else {
+  as.character(args$similarity_calibration)
+}
+
 cat("  alpha_init =", alpha_init, "\n")
 cat("  a_alpha    =", a_alpha, "\n")
-cat("  b_alpha    =", b_alpha, "\n\n")
+cat("  b_alpha    =", b_alpha, "\n")
+
+cat("  calibration =", similarity_calibration, "\n\n")
 
 # seed (default 123)
 if (is.null(args$seed)) {
@@ -139,8 +147,8 @@ mcmcpost <- esbm(
   x         = x_df,
   similarity_fun = similarity_fun,
   sim_args       = sim_args,
-  alpha_g = alpha_g_spec
-#  similarity_calibration = "geometric"
+  alpha_g = alpha_g_spec,
+  similarity_calibration = similarity_calibration
 )
 
 cat("Sampler finished.\n\n")
@@ -148,7 +156,7 @@ cat("Sampler finished.\n\n")
 ## ------------------------------- ##
 ## Save results
 ## ------------------------------- ##
-out_dir <- here("simulation", "learn_alpha", "results", "twoCov")
+out_dir <- here("simulation", "learn_alpha", similarity_calibration, "results", "twoCov")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 alpha_tag <- sprintf(
@@ -170,6 +178,7 @@ saveRDS(
     mcmcpost = mcmcpost,
     file     = data_path,
     alpha_g  = alpha_g_spec,
+    similarity_calibration = similarity_calibration,
     N_iter   = N_iter,
     scenario = scenario,
     seed     = seed

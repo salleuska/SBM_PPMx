@@ -10,8 +10,11 @@ library(cluster)
 ##---------------------------##
 ## Settings
 ##---------------------------##
+similarity_calibration <- "geometric"
+# similarity_calibration <- "normalized"
 
-results_dir <- here("simulation", "learn_alpha", "results", "twoCov")
+results_dir <- here("simulation", "learn_alpha", 
+  similarity_calibration, "results", "twoCov")
 
 sim_paths <- list(
   NN = here("simulation", "data", "binarySBM_2cov_NN.rds"),
@@ -77,16 +80,17 @@ res_for_scenario <- function(sim_path, scenario_files) {
 
     Z_keep <- Z_post[, keep_i, drop = FALSE]
 
+    ## entire traceplot for diagnostic
     alpha_post <- res$mcmcpost$alpha_g_post
     alpha_keep <- NULL
     if (!is.null(alpha_post)) {
-      alpha_keep <- alpha_post[, keep_i, drop = FALSE]
+      alpha_keep <- alpha_post
     }
 
     alpha_rate_post <- res$mcmcpost$alpha_rate_post
     alpha_rate_keep <- NULL
     if (!is.null(alpha_rate_post)) {
-      alpha_rate_keep <- alpha_rate_post[, keep_i, drop = FALSE]
+      alpha_rate_keep <- alpha_rate_post
     }
 
     psm_mat <- psm(t(Z_keep))
@@ -128,7 +132,8 @@ res_for_scenario <- function(sim_path, scenario_files) {
 ## Build and save
 ##---------------------------##
 
-out_dir <- here("simulation", "learn_alpha", "results", "processed", "twoCov")
+out_dir <- here("simulation", "learn_alpha",
+similarity_calibration,  "results", "processed", "twoCov")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 combined_NN <- res_for_scenario(sim_paths$NN, files_by_scenario$NN)

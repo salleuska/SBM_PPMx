@@ -10,25 +10,29 @@ library(tools)
 library(here)
 ################################
 ## set directory for output
-outDir <- here("simulation", "learn_alpha", "results", "processed", "oneCov")
+similarity_calibration <- "geometric"
+# similarity_calibration <- "normalized"
+
+outDir <- here("simulation", "learn_alpha", similarity_calibration, 
+  "results", "processed", "oneCov")
 dir.create(outDir, recursive = TRUE, showWarnings = FALSE)
 ################################
 
 ## read processed results (1-cov)
 res_neutral <- readRDS(
-  here("simulation", "learn_alpha", "results", "processed", "oneCov",
+  here("simulation", "learn_alpha", similarity_calibration, "results", "processed", "oneCov",
        "scenario_1cov_neutral_results.rds")
 )
 
 res_info <- readRDS(
-  here("simulation", "learn_alpha", "results", "processed", "oneCov",
+  here("simulation", "learn_alpha",similarity_calibration, "results", "processed", "oneCov",
        "scenario_1cov_informative_results.rds")
 )
 
-res_mis_rand <- readRDS(
-  here("simulation", "learn_alpha", "results", "processed", "oneCov",
-       "scenario_1cov_mislead_random_results.rds")
-)
+# res_mis_rand <- readRDS(
+#   here("simulation", "learn_alpha", "results", "processed", "oneCov",
+#        "scenario_1cov_mislead_random_results.rds")
+# )
 
 # res_mis_shift <- readRDS(
 #   here("simulation", "learn_alpha", "results", "processed", "oneCov",
@@ -65,13 +69,12 @@ extract_df <- function(obj, scen_name) {
 #############################################################################
 df <- rbind(
   extract_df(res_neutral,   "neutral"),
-  extract_df(res_info,      "informative"),
-  extract_df(res_mis_rand,  "misleading")
+  extract_df(res_info,      "informative")
 )
 
 df$scenario <- factor(
   df$scenario,
-  levels = c("neutral", "informative", "misleading")
+  levels = c("neutral", "informative")
 )
 
 
@@ -119,54 +122,69 @@ p_ari <- ggplot(df, aes(x = scenario, y = ARI_mean, color = prior)) +
 
 ggsave(file.path(outDir, "ARI_mean_withSD_learnedAlpha_1cov.pdf"), p_ari, width = 7, height = 4)
 
-trace_df <- function(obj, scenario, result_name) {
-
+#############################################################################
+## Trace plots: one PDF per scenario/result
+#############################################################################
+make_trace_df <- function(obj, scenario, result_name) {
   r <- obj$results[[result_name]]
 
+  alpha <- as.numeric(r$alpha_post)
+  rate  <- as.numeric(r$alpha_rate_post)
+  b_alpha <- r$alpha_g$b_alpha
+
   data.frame(
-    iter = seq_along(r$alpha_post),
-    alpha = as.numeric(r$alpha_post),
-    scenario = scenario
+    iter = seq_along(alpha),
+    alpha = alpha,
+    similarity = rate - b_alpha,
+    scenario = scenario,
+    tag = result_name
   )
 }
 
-trace_dat <- rbind(
-  trace_df(
-    res_neutral,
-    "neutral",
-    names(res_neutral$results)[1]
-  ),
-  trace_df(
-    res_info,
-    "informative",
-    names(res_info$results)[1]
-  ),
-  trace_df(
-    res_mis_rand,
-    "mislead_random",
-    names(res_mis_rand$results)[1]
+
+plot_trace_pair <- function(obj, scenario, result_name, outDir) {
+
+  dat <- make_trace_df(obj, scenario, result_name)
+
+  mu_alpha <- mean(dat$alpha, na.rm = TRUE)
+  dat$alpha_rm <- cumsum(dat$alpha) / seq_along(dat$alpha)
+
+  p_alpha <- ggplot(dat, aes(iter)) +
+    geom_line(aes(y = alpha), alpha = 0.35, linewidth = 0.3) +
+    geom_line(aes(y = alpha_rm), linewidth = 1) +
+    geom_hline(yintercept = mu_alpha, linetype = 2) +
+    theme_minimal(base_size = 14) +
+    labs(title = paste(scenario, "scenario. alpha trace."),
+         subtitle = paste("mean =", round(mu_alpha, 2)),
+         x = NULL,
+         y = expression(alpha[g]))
+
+  mu_sim <- mean(dat$similarity, na.rm = TRUE)
+  dat$sim_rm <- cumsum(dat$similarity) / seq_along(dat$similarity)
+
+  p_sim <- ggplot(dat, aes(iter)) +
+    geom_line(aes(y = similarity), alpha = 0.35, linewidth = 0.3) +
+    geom_line(aes(y = sim_rm), linewidth = 1) +
+    geom_hline(yintercept = mu_sim, linetype = 2) +
+    theme_minimal(base_size = 14) +
+    labs(title = paste(scenario, "scenario. Similarity trace."),
+         subtitle = paste("mean =", round(mu_sim, 2)),
+         x = "Iteration",
+         y = "Similarity")
+
+  p <- cowplot::plot_grid(p_alpha, p_sim, ncol = 1, align = "v")
+
+  ggsave(
+    file.path(outDir,
+              paste0("trace_alpha_similarity_", scenario, "_", result_name, ".pdf")),
+    p,
+    width = 7,
+    height = 8
   )
-)
+}
 
-p_trace <- ggplot(trace_dat,
-                  aes(x = iter, y = alpha, color = scenario)) +
-  geom_line(alpha = 0.7) +
-  theme_minimal(base_size = 14) +
-  labs(
-    title = "Trace plots for learned alpha",
-    x = "Iteration",
-    y = expression(alpha[g])
-  ) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    legend.title = element_blank()
-  )
+for (nm in names(res_neutral$results))
+  plot_trace_pair(res_neutral, "neutral", nm, outDir)
 
-p_trace
-
-ggsave(
-  file.path(outDir, "trace_alpha_1cov.pdf"),
-  p_trace,
-  width = 7,
-  height = 4
-)
+for (nm in names(res_info$results))
+  plot_trace_pair(res_info, "informative", nm, outDir)
