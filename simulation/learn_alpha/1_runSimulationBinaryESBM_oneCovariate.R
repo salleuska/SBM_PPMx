@@ -22,11 +22,18 @@ b_alpha    <- if (is.null(args$b_alpha)) 1 else as.numeric(args$b_alpha)
 seed     <- if (is.null(args$seed)) 123 else as.integer(args$seed)
 N_iter   <- if (is.null(args$N_iter)) 10000 else as.integer(args$N_iter)
 
+similarity_calibration <- if (is.null(args$similarity_calibration)) {
+  "normalized"
+} else {
+  as.character(args$similarity_calibration)
+}
+
 cat("Running ESBM with learned alpha:\n")
 cat("  file       =", data_path, "\n")
 cat("  alpha init =", alpha_init, "\n")
 cat("  a_alpha    =", a_alpha, "\n")
 cat("  b_alpha    =", b_alpha, "\n")
+cat("  calibration =", similarity_calibration, "\n")
 cat("  seed       =", seed, "\n")
 cat("  N_iter     =", N_iter, "\n\n")
 
@@ -110,7 +117,8 @@ mcmcpost <- esbm(
   x = x_df,
   similarity_fun = similarity_fun,
   sim_args = sim_args,
-  alpha_g = alpha_spec)
+  alpha_g = alpha_spec, 
+  similarity_calibration = similarity_calibration)
 
 
 cat("Done.\n\n")
@@ -118,15 +126,16 @@ cat("Done.\n\n")
 ## ------------------------------- ##
 ## Save output
 ## ------------------------------- ##
-out_dir <- here("simulation", "learn_alpha", "results", "oneCov")
+out_dir <- here("simulation", "learn_alpha", similarity_calibration, "results", "oneCov")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 alpha_tag <- sprintf(
-  "init-%s_a-%s_b-%s",
+  "cal-%s_init-%s_a-%s_b-%s",
+  similarity_calibration,
   gsub("\\.", "p", sprintf("%.2f", alpha_init)),
   gsub("\\.", "p", sprintf("%.2f", a_alpha)),
-  gsub("\\.", "p", sprintf("%.2f", b_alpha)))
-
+  gsub("\\.", "p", sprintf("%.2f", b_alpha))
+)
 base_name  <- file_path_sans_ext(basename(data_path))
 
 out_file <- file.path(

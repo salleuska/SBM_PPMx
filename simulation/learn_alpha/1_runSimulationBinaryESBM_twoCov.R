@@ -139,8 +139,8 @@ mcmcpost <- esbm(
   x         = x_df,
   similarity_fun = similarity_fun,
   sim_args       = sim_args,
-  alpha_g = alpha_g_spec,
-  similarity_calibration = "geometric"
+  alpha_g = alpha_g_spec
+#  similarity_calibration = "geometric"
 )
 
 cat("Sampler finished.\n\n")
