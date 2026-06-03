@@ -28,15 +28,11 @@ res_info <- readRDS(
        "scenario_1cov_informative_results.rds")
 )
 
-# res_mis_rand <- readRDS(
-#   here("simulation", "learn_alpha", "results", "processed", "oneCov",
-#        "scenario_1cov_mislead_random_results.rds")
-# )
+res_mis_rand <- readRDS(
+  here("simulation", "learn_alpha", "results", "processed", "oneCov",
+       "scenario_1cov_mislead_random_results.rds")
+ )
 
-# res_mis_shift <- readRDS(
-#   here("simulation", "learn_alpha", "results", "processed", "oneCov",
-#        "scenario_1cov_mislead_shifted_results.rds")
-# )
 ################################
 extract_df <- function(obj, scen_name) {
   out <- lapply(names(obj$results), function(nm) {
@@ -69,11 +65,12 @@ extract_df <- function(obj, scen_name) {
 df <- rbind(
   extract_df(res_neutral,   "neutral"),
   extract_df(res_info,      "informative")
+  extract_df(res_mis_rand,  "misleading")
 )
 
 df$scenario <- factor(
   df$scenario,
-  levels = c("neutral", "informative")
+  levels = c("neutral", "informative", "misleading")
 )
 
 

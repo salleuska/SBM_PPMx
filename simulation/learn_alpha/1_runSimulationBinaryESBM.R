@@ -64,33 +64,44 @@ x  <- sim_obj$x              # matrix n x 2; use only first column for one-cov r
 z0 <- sim_obj$partition
 
 ## ------------------------------- ##
-## Infer scenario 
+## Infer scenario from file name
 ## ------------------------------- ##
-## Infer scenario from filename
-fname <- basename(data_path)
+fname <- tools::file_path_sans_ext(basename(data_path))
 
-if (grepl("1cov_neutral", fname, ignore.case = TRUE)) {
-  scenario <- "neutral"
-} else if (grepl("1cov_informative", fname, ignore.case = TRUE)) {
-  scenario <- "informative"
-} else if (grepl("1cov_mislead_random", fname, ignore.case = TRUE)) {
-  scenario <- "mislead_random"
-} else if (grepl("1cov_mislead_shifted", fname, ignore.case = TRUE)) {
-  scenario <- "mislead_shifted"
-} else {
-  stop("Filename must contain one of: 1cov_neutral / 1cov_informative / 1cov_mislead_random / 1cov_mislead_shifted. Found: ", fname)
+scenario <- sub(
+  "^binarySBM_[0-9]+cov_([A-Z]+)$",
+  "\\1",
+  fname
+)
+
+if (scenario == fname) {
+  stop("Could not infer scenario from filename: ", fname)
 }
 
-cat("Scenario:", scenario, "\n\n")
+nCov <- as.integer(sub(
+  "^binarySBM_([0-9]+)cov_[A-Z]+$",
+  "\\1",
+  fname
+))
+
+cat("Scenario:", scenario, "\n")
+cat("nCov:", nCov, "\n\n")
+
 
 ## ------------------------------- ##
-## Prepare covariate and similarity
+## Prepare covariates and similarity
 ## ------------------------------- ##
 
-x_df <- data.frame(x1 = x[, 1])
+x_df <- as.data.frame(x)
+colnames(x_df) <- paste0("x", seq_len(nCov))
 
 similarity_fun <- similarity_ppmx_gaussian_mean
-sim_args       <- list(list(m0 = 0, s0 = sqrt(1)))
+
+sim_args <- replicate(
+  nCov,
+  list(m0 = 0, s0 = sqrt(1)),
+  simplify = FALSE
+)
 
 alpha_spec <- list(
   init    = alpha_init,
@@ -126,7 +137,18 @@ cat("Done.\n\n")
 ## ------------------------------- ##
 ## Save output
 ## ------------------------------- ##
-out_dir <- here("simulation", "learn_alpha", similarity_calibration, "results", "oneCov")
+
+## ------------------------------- ##
+## Save output
+## ------------------------------- ##
+out_dir <- here(
+  "simulation",
+  "learn_alpha",
+  similarity_calibration,
+  "results",
+  paste0(nCov, "Cov")
+)
+
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 alpha_tag <- sprintf(
@@ -136,12 +158,14 @@ alpha_tag <- sprintf(
   gsub("\\.", "p", sprintf("%.2f", a_alpha)),
   gsub("\\.", "p", sprintf("%.2f", b_alpha))
 )
-base_name  <- file_path_sans_ext(basename(data_path))
 
-out_file <- file.path(
-  out_dir,
-  sprintf("postOneCov_%s_alphaLearn-%s_seed-%d.rds",
-          base_name, alpha_tag, seed)
+base_name <- tools::file_path_sans_ext(basename(data_path))
+
+out_file <- file.path(out_dir,
+  sprintf(
+    "post_%s_alphaLearn-%s_seed-%d.rds",
+    base_name, alpha_tag, seed
+  )
 )
 
 saveRDS(
@@ -151,9 +175,11 @@ saveRDS(
     alpha_g    = alpha_spec,
     seed       = seed,
     scenario   = scenario,
+    nCov       = nCov,
     N_iter     = N_iter
   ),
   file = out_file
 )
 
 cat("Saved posterior to:\n  ", out_file, "\n")
+
