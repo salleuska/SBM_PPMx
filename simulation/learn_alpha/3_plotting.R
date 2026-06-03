@@ -57,16 +57,7 @@ if (length(processed_files) == 0) {
 ## ------------------------------------------------------------
 ## Helpers
 ## ------------------------------------------------------------
-
-scenario_label <- function(sc) {
-  d <- c(
-    N = "neutral",
-    I = "informative",
-    M = "misleading"
-  )
-
-  paste(d[strsplit(sc, "")[[1]]], collapse = " + ")
-}
+scenario_caption <- "N = neutral, I = informative, M = misleading"
 
 extract_df <- function(f) {
 
@@ -82,36 +73,45 @@ extract_df <- function(f) {
 
     r <- obj$results[[nm]]
 
-    alpha_vec <- as.numeric(r$alpha_post)
+    alpha_mat <- r$alpha_post
 
-    ARI_vec <- apply(
-      r$Z_post,
-      2L,
+    if (is.null(dim(alpha_mat))) {
+      alpha_mat <- matrix(alpha_mat, nrow = 1)
+    }
+
+    ARI_vec <- apply(r$Z_post, 2,
       function(z_t) mclust::adjustedRandIndex(z_t, obj$sim$partition_true)
     )
 
-    data.frame(
-      sim_name = sim_name,
-      nCov = nCov,
-      scenario = scenario,
-      scenario_label = scenario_label(scenario),
-      tag = nm,
-      seed = r$seed,
-      a_alpha = r$alpha_g$a_alpha,
-      b_alpha = r$alpha_g$b_alpha,
-      prior = paste0("Gamma(", r$alpha_g$a_alpha, ",", r$alpha_g$b_alpha, ")"),
+    out_alpha <- lapply(seq_len(nrow(alpha_mat)), function(j) {
 
-      alpha_mean = mean(alpha_vec, na.rm = TRUE),
-      alpha_lwr = quantile(alpha_vec, 0.025, na.rm = TRUE),
-      alpha_upr = quantile(alpha_vec, 0.975, na.rm = TRUE),
+      alpha_vec <- as.numeric(alpha_mat[j, ])
 
-      ARI_vi = r$ARI_vi,
-      ARI_mean = mean(ARI_vec, na.rm = TRUE),
-      ARI_lwr = quantile(ARI_vec, 0.025, na.rm = TRUE),
-      ARI_upr = quantile(ARI_vec, 0.975, na.rm = TRUE),
+      data.frame(
+        sim_name = sim_name,
+        nCov = nCov,
+        scenario_label = scenario,
+        covariate = paste0("x", j),
+        tag = nm,
+        seed = r$seed,
+        a_alpha = r$alpha_g$a_alpha,
+        b_alpha = r$alpha_g$b_alpha,
+        prior = paste0("Gamma(", r$alpha_g$a_alpha, ",", r$alpha_g$b_alpha, ")"),
 
-      silhouette = r$silhouette$mean
-    )
+        alpha_mean = mean(alpha_vec, na.rm = TRUE),
+        alpha_lwr = quantile(alpha_vec, 0.025, na.rm = TRUE),
+        alpha_upr = quantile(alpha_vec, 0.975, na.rm = TRUE),
+
+        ARI_vi = r$ARI_vi,
+        ARI_mean = mean(ARI_vec, na.rm = TRUE),
+        ARI_lwr = quantile(ARI_vec, 0.025, na.rm = TRUE),
+        ARI_upr = quantile(ARI_vec, 0.975, na.rm = TRUE),
+
+        silhouette = r$silhouette$mean
+      )
+    })
+
+    do.call(rbind, out_alpha)
   })
 
   do.call(rbind, out)
@@ -142,24 +142,27 @@ nCov_tag <- if (is.null(nCov_plot)) "all" else paste0(nCov_plot, "Cov")
 ## Posterior alpha plot
 ## ------------------------------------------------------------
 
-p_alpha <- ggplot(df, aes(x = scenario_label, y = alpha_mean, color = prior)) +
-  geom_point(position = position_dodge(width = 0.5), size = 2.5) +
+p_alpha <- ggplot(df, aes(x = scenario_label, y = alpha_mean, color = covariate)) +
+  geom_point(position = position_dodge(width = 0.6), size = 2.5) +
   geom_errorbar(
     aes(ymin = alpha_lwr, ymax = alpha_upr),
-    position = position_dodge(width = 0.5),
+    position = position_dodge(width = 0.6),
     width = 0.2,
     alpha = 0.7
   ) +
   theme_minimal(base_size = 14) +
+  ylim(c(0,5)) + 
   labs(
     title = "Posterior distribution of learned alpha",
-    x = NULL,
-    y = expression(alpha[g])
+    subtitle = scenario_caption,
+    x = "Scenario",
+    y = expression(alpha[g]),
+    color = "Covariate"
   ) +
   theme(
     plot.title = element_text(face = "bold"),
-    legend.title = element_blank(),
-    axis.text.x = element_text(angle = 30, hjust = 1)
+    legend.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)
   )
 
 if (is.null(nCov_plot)) {
@@ -176,8 +179,9 @@ ggsave(
 ## ------------------------------------------------------------
 ## ARI plot with 95% posterior credible interval
 ## ------------------------------------------------------------
+df_ari <- df[!duplicated(df$tag), ]
 
-p_ari <- ggplot(df, aes(x = scenario_label, y = ARI_mean, color = prior)) +
+p_ari <- ggplot(df_ari, aes(x = scenario_label, y = ARI_mean)) +
   geom_point(position = position_dodge(width = 0.5), size = 2.5) +
   geom_errorbar(
     aes(ymin = ARI_lwr, ymax = ARI_upr),

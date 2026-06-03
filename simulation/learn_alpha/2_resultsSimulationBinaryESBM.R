@@ -133,10 +133,26 @@ res_for_sim <- function(sim_name, scenario_files) {
     Z_keep <- Z_post[, keep_i, drop = FALSE]
 
     alpha_post <- res$mcmcpost$alpha_g_post
-    alpha_keep <- if (!is.null(alpha_post)) alpha_post[keep_i] else NULL
+
+    alpha_keep <- NULL
+    if (!is.null(alpha_post)) {
+      if (is.matrix(alpha_post)) {
+        alpha_keep <- alpha_post[, keep_i, drop = FALSE]
+      } else {
+        alpha_keep <- alpha_post[keep_i]
+      }
+    }
 
     alpha_rate_post <- res$mcmcpost$alpha_rate_post
-    alpha_rate_keep <- if (!is.null(alpha_rate_post)) alpha_rate_post[keep_i] else NULL
+
+    alpha_rate_keep <- NULL
+    if (!is.null(alpha_rate_post)) {
+      if (is.matrix(alpha_rate_post)) {
+        alpha_rate_keep <- alpha_rate_post[, keep_i, drop = FALSE]
+      } else {
+        alpha_rate_keep <- alpha_rate_post[keep_i]
+      }
+    }
 
     psm_mat <- psm(t(Z_keep))
 

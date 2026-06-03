@@ -130,74 +130,113 @@ esbm <- function(Y, seed, N_iter, prior,
   # and if so we check on whether there is a prior
   # for alpha or not
   # ----------------------------------------------  
-  if (!is.null(x)){
-    print("Note : covariates have been provided")
-    # x must be a data.frame
+  ## Default: no covariates, no learned alpha
+
+  ## ----------------------------------------------
+  ## Covariate and alpha checks
+  ## ----------------------------------------------
+
+  has_covariates <- !is.null(x)
+  learn_alpha_g  <- FALSE
+
+  J <- 0L
+  a_alpha <- NULL
+  b_alpha <- NULL
+
+  if (!has_covariates) {
+
+    similarity_fun <- NULL
+    sim_args <- list()
+    alpha_g <- NULL
+
+  } else {
+
+    message("Note: covariates have been provided.")
+
     if (!is.data.frame(x)) {
-      stop("When similarity_fun is used, x must be a data.frame.")
+      stop("x must be a data.frame when covariates are provided.")
     }
 
-    # coerce similarity_fun to list so Gibbs loop is unified
+    if (ncol(x) == 0L) {
+      stop("x must have at least one column.")
+    }
+
+    if (is.null(similarity_fun)) {
+      stop("similarity_fun must be provided when x is provided.")
+    }
+
     if (is.function(similarity_fun)) {
       similarity_fun <- list(similarity_fun)
-    } else if (!is.list(similarity_fun)) {
-      stop("similarity_fun must be either a function or a list of functions.")
+    }
+
+    if (!is.list(similarity_fun) || !all(vapply(similarity_fun, is.function, logical(1)))) {
+      stop("similarity_fun must be a function or a list of functions.")
     }
 
     J <- length(similarity_fun)
 
-    # x must have exactly one column per similarity function
     if (ncol(x) != J) {
       stop("ncol(x) must equal length(similarity_fun).")
     }
 
-    ## sim_args must also be a list of length J
     if (!is.list(sim_args)) {
-      stop("sim_args must be a list when similarity_fun is provided.")
-    }
-    if (length(sim_args) == 1L && J > 1L) {
-      sim_args <- replicate(J, sim_args, simplify = FALSE)
-    }
-    if (length(sim_args) != J) {
-      stop("sim_args must have length equal to length(similarity_fun).")
+      stop("sim_args must be a list.")
     }
 
-    ## ----------------------------------------------
-    ## check similarity calibration
+    if (length(sim_args) == 0L) {
+      sim_args <- replicate(J, list(), simplify = FALSE)
+    }
+
+    if (length(sim_args) == 1L && J > 1L) {
+      sim_args <- replicate(J, sim_args[[1L]], simplify = FALSE)
+    }
+
+    if (length(sim_args) != J) {
+      stop("sim_args must have length 0, 1, or J.")
+    }
+
     similarity_calibration <- match.arg(similarity_calibration)
 
-    ## ----------------------------------------------
-    ## SP: check prior for covariate weights alpha_g
-    ## ----------------------------------------------
-    
     learn_alpha_g <- is.list(alpha_g)
 
     if (learn_alpha_g) {
+
+      required_names <- c("init", "a_alpha", "b_alpha")
+
+      if (!all(required_names %in% names(alpha_g))) {
+        stop("When alpha_g is a list, it must contain init, a_alpha, and b_alpha.")
+      }
 
       alpha_g_init <- alpha_g$init
       a_alpha <- alpha_g$a_alpha
       b_alpha <- alpha_g$b_alpha
 
-
-      # recycle scalar hyperparameters
       if (length(alpha_g_init) == 1L) alpha_g_init <- rep(alpha_g_init, J)
       if (length(a_alpha) == 1L) a_alpha <- rep(a_alpha, J)
       if (length(b_alpha) == 1L) b_alpha <- rep(b_alpha, J)
 
-      # basic checks
       if (length(alpha_g_init) != J) stop("alpha_g$init must have length 1 or J.")
       if (length(a_alpha) != J) stop("alpha_g$a_alpha must have length 1 or J.")
       if (length(b_alpha) != J) stop("alpha_g$b_alpha must have length 1 or J.")
+
+      if (any(alpha_g_init <= 0)) stop("alpha_g$init must be positive.")
+      if (any(a_alpha <= 0)) stop("alpha_g$a_alpha must be positive.")
+      if (any(b_alpha <= 0)) stop("alpha_g$b_alpha must be positive.")
 
       alpha_g <- alpha_g_init
 
     } else {
 
-      # fixed weights
-      if (length(alpha_g) == 1L) alpha_g <- rep(alpha_g, J)
+      if (length(alpha_g) == 1L) {
+        alpha_g <- rep(alpha_g, J)
+      }
 
       if (length(alpha_g) != J) {
         stop("alpha_g must have length 1 or J.")
+      }
+
+      if (any(alpha_g < 0)) {
+        stop("Fixed alpha_g values must be nonnegative.")
       }
     }
   }

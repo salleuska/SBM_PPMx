@@ -28,7 +28,10 @@ similarity_calibration <- if (is.null(args$similarity_calibration)) {
   as.character(args$similarity_calibration)
 }
 
-cat("Running ESBM with learned alpha:\n")
+model <- if (is.null(args$model)) {"ESBM"} else {as.character(args$model)}
+
+cat("Running the following:\n")
+cat("  model = ", model, "\n")
 cat("  file       =", data_path, "\n")
 cat("  alpha init =", alpha_init, "\n")
 cat("  a_alpha    =", a_alpha, "\n")
@@ -60,7 +63,7 @@ set.seed(seed)
 sim_obj <- readRDS(data_path)
 
 Y  <- sim_obj$Y
-x  <- sim_obj$x              # matrix n x 2; use only first column for one-cov runs
+x <- sim_obj[["x"]]            # matrix n x 2; use only first column for one-cov runs
 z0 <- sim_obj$partition
 
 ## ------------------------------- ##
@@ -92,46 +95,82 @@ cat("nCov:", nCov, "\n\n")
 ## Prepare covariates and similarity
 ## ------------------------------- ##
 
-x_df <- as.data.frame(x)
-colnames(x_df) <- paste0("x", seq_len(nCov))
+if (model == "SBM") {
 
-similarity_fun <- similarity_ppmx_gaussian_mean
+  x_df <- NULL
+  similarity_fun <- NULL
+  sim_args <- NULL
+  alpha_spec <- NULL
 
-sim_args <- replicate(
-  nCov,
-  list(m0 = 0, s0 = sqrt(1)),
-  simplify = FALSE
-)
+} else {
 
-alpha_spec <- list(
-  init    = alpha_init,
-  a_alpha = a_alpha,
-  b_alpha = b_alpha
-)
+  x_df <- as.data.frame(x)
+  colnames(x_df) <- paste0("x", seq_len(nCov))
+
+  similarity_fun <- replicate(
+    nCov,
+    similarity_ppmx_gaussian_mean,
+    simplify = FALSE
+  )
+
+  sim_args <- replicate(
+    nCov,
+    list(m0 = 0, s0 = sqrt(1)),
+    simplify = FALSE
+  )
+
+  alpha_spec <- list(
+    init    = alpha_init,
+    a_alpha = a_alpha,
+    b_alpha = b_alpha
+  )
+}
+
+
 ## ------------------------------- ##
 ## Run ESBM
 ## ------------------------------- ##
-cat("Starting ESBM...\n")
+cat("Starting sampling...\n")
 
-mcmcpost <- esbm(
-  Y      = Y,
-  seed   = seed,
-  N_iter = N_iter,
-  prior  = list(
-    name    = "DM",
-    beta_DM = beta_dm,
-    H_DM    = H_dm
-  ),
-  z_init = sample(1:4, nrow(Y), replace = TRUE),
-  a = a,
-  b = b,
-  x = x_df,
-  similarity_fun = similarity_fun,
-  sim_args = sim_args,
-  alpha_g = alpha_spec, 
-  similarity_calibration = similarity_calibration)
+if (model == "SBM") {
 
+  mcmcpost <- esbm(
+    Y      = Y,
+    seed   = seed,
+    N_iter = N_iter,
+    prior  = list(
+      name    = "DM",
+      beta_DM = beta_dm,
+      H_DM    = H_dm
+    ),
+    z_init = sample(1:4, nrow(Y), replace = TRUE),
+    a = a,
+    b = b,
+    x = NULL
+  )
 
+} else {
+
+  mcmcpost <- esbm(
+    Y      = Y,
+    seed   = seed,
+    N_iter = N_iter,
+    prior  = list(
+      name    = "DM",
+      beta_DM = beta_dm,
+      H_DM    = H_dm
+    ),
+    z_init = sample(1:4, nrow(Y), replace = TRUE),
+    a = a,
+    b = b,
+    x = x_df,
+    similarity_fun = similarity_fun,
+    sim_args = sim_args,
+    alpha_g = alpha_spec,
+    similarity_calibration = similarity_calibration
+  )
+
+}
 cat("Done.\n\n")
 
 ## ------------------------------- ##
