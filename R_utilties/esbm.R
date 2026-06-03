@@ -102,7 +102,7 @@ esbm <- function(Y, seed, N_iter, prior,
                  a = 1, b = 1,
                  x = NULL, similarity_fun = NULL, sim_args = list(),
                  alpha_g = 1, 
-                 similarity_calibration = c("normalized", "geometric")) {  
+                 similarity_calibration = c("normalized", "raw")) {  
  
   # ----------------------------------------------
   # Selection of the prior distribution to be used
@@ -326,11 +326,11 @@ esbm <- function(Y, seed, N_iter, prior,
             log_similarity_g <-
               log_similarity_g + alpha_g[j] * log_g_j
 
-          } else if (similarity_calibration == "geometric") {
+          } else if (similarity_calibration == "raw") {
 
             # geometric averaging across covariates
             log_similarity_g <-
-              log_similarity_g + alpha_g[j] * log_g_j / J
+              log_similarity_g + alpha_g[j] * log_g_j 
           }
         }
       }
@@ -391,9 +391,9 @@ esbm <- function(Y, seed, N_iter, prior,
 
           rate_alpha <- b_alpha[j] - sum(log_g_h)
 
-        } else if (similarity_calibration == "geometric") {
+        } else if (similarity_calibration == "raw") {
 
-          rate_alpha <- b_alpha[j] - sum(log_g_h) / J
+          rate_alpha <- b_alpha[j] - sum(log_g_h)
         }
 
         alpha_rate_post[j, t] <- rate_alpha
