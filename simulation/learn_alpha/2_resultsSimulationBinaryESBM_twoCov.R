@@ -10,8 +10,7 @@ library(cluster)
 ##---------------------------##
 ## Settings
 ##---------------------------##
-similarity_calibration <- "geometric"
-# similarity_calibration <- "normalized"
+similarity_calibration <- "raw"
 
 results_dir <- here("simulation", "learn_alpha", 
   similarity_calibration, "results", "twoCov")

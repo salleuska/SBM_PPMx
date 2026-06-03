@@ -14,8 +14,7 @@ library(here)
 ################################
 ## output directory
 ################################
-similarity_calibration <- "geometric"
-# similarity_calibration <- "normalized"
+similarity_calibration <- "raw"
 
 outDir <- here("simulation", "learn_alpha", similarity_calibration, "results", "processed", "twoCov")
 dir.create(outDir, recursive = TRUE, showWarnings = FALSE)

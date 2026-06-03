@@ -10,8 +10,7 @@ library(tools)
 library(here)
 ################################
 ## set directory for output
-similarity_calibration <- "geometric"
-# similarity_calibration <- "normalized"
+similarity_calibration <- "raw"
 
 outDir <- here("simulation", "learn_alpha", similarity_calibration, 
   "results", "processed", "oneCov")

@@ -15,8 +15,7 @@ library(cluster)    # to compute silhouette
 ## Settings
 ##---------------------------##
 
-similarity_calibration <- "geometric"
-# similarity_calibration <- "normalized"
+similarity_calibration <- "raw"
 
 ## Paths to results directory and simulation files
 results_dir <- here("simulation", "learn_alpha", similarity_calibration, "results", "oneCov")
