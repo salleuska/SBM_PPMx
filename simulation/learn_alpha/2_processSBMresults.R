@@ -1,5 +1,5 @@
 ##---------------------------##------------------##
-## Process ESBM results for binary SBM simulation
+## Process network-only SBM baseline results
 ##---------------------------##------------------##
 
 args <- R.utils::commandArgs(asValue = TRUE)
@@ -14,26 +14,20 @@ library(cluster)
 ## Settings
 ##---------------------------##
 
-similarity_calibration <- if (is.null(args$similarity_calibration)) {
-  "raw"
-} else {
-  as.character(args$similarity_calibration)
-}
-
 burn_frac <- if (is.null(args$burn_frac)) 0.4 else as.numeric(args$burn_frac)
 thin_step <- if (is.null(args$thin_step)) 1 else as.integer(args$thin_step)
 
 results_root <- here(
   "simulation",
   "learn_alpha",
-  similarity_calibration,
+  "SBM",
   "results"
 )
 
 out_dir <- here(
   "simulation",
   "learn_alpha",
-  similarity_calibration,
+  "SBM",
   "results",
   "processed"
 )
@@ -46,7 +40,7 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 get_sim_name <- function(path) {
   sub(
-    "^post_(binarySBM_[0-9]+cov_[A-Z]+)_alphaLearn-.*$",
+    "^postSBM_(binarySBM_[0-9]+cov_[A-Z]+)_seed-[0-9]+$",
     "\\1",
     tools::file_path_sans_ext(basename(path))
   )
@@ -68,18 +62,26 @@ get_nCov <- function(path) {
 
 files_all <- list.files(
   results_root,
-  pattern = "^post_binarySBM_.*\\.rds$",
+  pattern = "^postSBM_binarySBM_.*\\.rds$",
   recursive = TRUE,
   full.names = TRUE
 )
 
 if (length(files_all) == 0) {
-  stop("No posterior files found in: ", results_root)
+  stop("No SBM posterior files found in: ", results_root)
 }
 
 sim_names <- get_sim_name(files_all)
 
-cat("Posterior files found:\n")
+if (any(sim_names == basename(files_all))) {
+  bad_files <- basename(files_all)[sim_names == basename(files_all)]
+  stop(
+    "Could not extract simulation names from: ",
+    paste(bad_files, collapse = ", ")
+  )
+}
+
+cat("SBM posterior files found:\n")
 print(table(sim_names))
 
 ##---------------------------##
@@ -128,28 +130,6 @@ res_for_sim <- function(sim_name, scenario_files) {
 
     Z_keep <- Z_post[, keep_i, drop = FALSE]
 
-    alpha_post <- res$mcmcpost$alpha_g_post
-
-    alpha_keep <- NULL
-    if (!is.null(alpha_post)) {
-      if (is.matrix(alpha_post)) {
-        alpha_keep <- alpha_post[, keep_i, drop = FALSE]
-      } else {
-        alpha_keep <- alpha_post[keep_i]
-      }
-    }
-
-    alpha_rate_post <- res$mcmcpost$alpha_rate_post
-
-    alpha_rate_keep <- NULL
-    if (!is.null(alpha_rate_post)) {
-      if (is.matrix(alpha_rate_post)) {
-        alpha_rate_keep <- alpha_rate_post[, keep_i, drop = FALSE]
-      } else {
-        alpha_rate_keep <- alpha_rate_post[keep_i]
-      }
-    }
-
     psm_mat <- psm(t(Z_keep))
 
     z_hat <- salso(t(Z_keep), loss = VI())
@@ -164,27 +144,31 @@ res_for_sim <- function(sim_name, scenario_files) {
 
     ARI_mean <- mean(ARI_iter)
     ARI_sd   <- sd(ARI_iter)
+    ARI_lwr  <- quantile(ARI_iter, 0.025)
+    ARI_upr  <- quantile(ARI_iter, 0.975)
 
     diss_mat <- 1 - psm_mat
     sil_obj  <- silhouette(z_hat, dist(diss_mat))
     sil_mean <- mean(sil_obj[, 3])
 
     combined$results[[tag]] <- list(
-      alpha_g         = res$alpha_g,
-      alpha_post      = alpha_keep,
-      alpha_rate_post = alpha_rate_keep,
+      alpha_g         = NULL,
+      alpha_post      = NULL,
+      alpha_rate_post = NULL,
       Z_post          = Z_keep,
       z_hat           = as.integer(z_hat),
       ARI_vi          = ARI_vi,
       ARI_mean        = ARI_mean,
       ARI_sd          = ARI_sd,
+      ARI_lwr         = ARI_lwr,
+      ARI_upr         = ARI_upr,
       silhouette      = list(object = sil_obj, mean = sil_mean),
       psm             = psm_mat,
       seed            = seed,
       scenario        = res$scenario,
       nCov            = res$nCov,
       N_iter          = N_iter,
-      model           = if (!is.null(res$model)) res$model else "ESBM"
+      model           = "SBM"
     )
   }
 

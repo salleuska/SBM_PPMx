@@ -1,78 +1,81 @@
-Supplementary code to the paper XXX by ABCD authors
+Supplementary code for an ESBM/PPMx project on stochastic block models with covariate-informed cohesion.
 
 ## Preliminaries
-Install packages in the `install.R` script. This repo uses the R library `here` for handlings project file paths reproducibly
 
-## Description
+Install the required R packages first. The project uses `here` to make file paths reproducible from the repository root.
 
-The directory `R_utilities` contains the file `esbm_original.R` and `stirling.cppp` from 
-[https://github.com/danieledurante/ESBM](https://github.com/danieledurante/ESBM)
-which include functions for the posterior sampling of stochastic block model for binary data with a categorical covariate
+## Repository layout
 
----
-- **`esbm.R`**  
-  Contains modified version of the ESBM sampler, with the possibility to pass one or more arbitrary similarities functions as an argument. Note that I have not checked that the postprocessing functions work.
+The core sampler code lives in the legacy folder `R_utilties/` (note the existing folder spelling in the repo).
 
-- **`similarity_functions.R`**  
-  Contains the interface and implementations of the allowed similarity functions. Each function takes a covariate vector/matrix for a cluster and returns a scalar similarity value.  
+- `R_utilties/esbm.R` is the main sampler used in this repository. It supports running with or without covariates and allows one or more similarity functions.
+- `R_utilties/stirling.cpp` provides the compiled helper routines used by the sampler.
+- `R_utilties/similarity_functions.R` defines the supported similarity functions and their arguments.
+- `test_sim_ESBM/` contains older sanity-check scripts used while extending the sampler.
+- `application_brain/` contains the applied analysis workflow for the brain-network example.
+- `simulation/` contains synthetic-data generation, simulation runners, result processing, and plotting scripts.
 
-  **2025-11-12 update:**  
-  Implemented a similarity based on a **normal auxiliary model**:  
-  - observation model: \( x_i \mid \mu_h \sim N(\mu_h, 1) \)  
-  - prior on cluster mean: \( \mu_h \sim N(m_0, s_0^2) \)  
-  This provides a continuous-covariate cohesion that can be raised to a power parameter \( \alpha \) for calibration.
+### Continuous-covariate similarity
 
-The `test_sim_ESBM` folder contains just some code to verify the new `esbm` function was working
+The repo includes a Gaussian auxiliary-model similarity for continuous covariates:
 
-### Planned extensions
+- observation model: \(x_i \mid \mu_h \sim N(\mu_h, 1)\)
+- prior on the cluster mean: \(\mu_h \sim N(m_0, s_0^2)\)
 
-We intend to extend the code to support:
+This cohesion can be calibrated through a learnable or fixed power parameter `alpha`.
 
-- Poisson likelihood for weighted networks (with and without self-loops);
-- cohesion for continuous covariates derived from full normal-normal marginalization;
-- circular covariates (e.g., von Mises-based cohesion);
-- weighted similarity functions and mixtures of similarities.
+## Simulation workflow
 
----
-
-## Notes on simulations
-
-All simulation code is located in the `simulation/` directory.
+All simulation code is under `simulation/`.
 
 ### Data generation
 
-**`0_simulateBinaryESBM.R`**  
-Creates synthetic binary networks under different covariate scenarios.  
-Output stored as `.rds` includes:
-- adjacency matrix `Y`;
-- covariates `x`;
-- true cluster labels `z_true`;
-- scenario metadata (e.g., one informative covariate, two covariates, or no covariate signal).
+`simulation/0_simulateBinaryESBM.R` creates binary-network datasets under several covariate scenarios. Each `.rds` file stores:
 
-### Running the simulation study
+- adjacency matrix `Y`
+- covariates `x`
+- true partition `partition`
+- scenario metadata such as number of covariates and whether they are informative or misleading
 
-Two scripts run the ESBM under different settings:
+### Running simulation experiments
 
-- **`1_runSimulationBinaryESBM_oneCovariate.R`**  
-  Uses only one covariate and tests different similarity strengths or models.
+The main learn-alpha runner is:
 
-- **`1_runSimulationBinaryESBM.R`**  
-   Version with both covariantes
+- `simulation/learn_alpha/1_runSimulationBinaryESBM.R`
 
-These scripts:
+It accepts command-line arguments such as:
 
-1. Parse input arguments (`data_path`, `alpha`, `seed`).  
-2. Load the dataset and the sampler.  
-3. Run ESBM with the chosen similarity and \( \alpha \).  
-4. Save results in `simulation/results/[oneCov/twoCov]`.
+- `data_path`
+- `seed`
+- `N_iter`
+- `model` (`ESBM` or `SBM`)
+- `similarity_calibration`
+- `alpha_init`, `a_alpha`, `b_alpha`
 
-Note: I run the scripts from bash in parallel via `runSimOneCov.sh` 
+Outputs are written under:
 
+- `simulation/learn_alpha/<calibration>/results/<nCov>Cov` for ESBM runs
+- `simulation/learn_alpha/SBM/results/<nCov>Cov` for network-only baseline runs
 
+The shell scripts in the repository are the intended orchestration layer for launching batches of runs in parallel.
 
-- **`2_resultsSimulationBinaryESBM.R`**
-Collects all outputs and computes:
-	ARI vs true labels,
-	effect of the similarity parameter ( \alpha ) by scenario.
+### Processing simulation outputs
 
+Learn-alpha ESBM outputs can be combined with:
 
+- `simulation/learn_alpha/2_resultsSimulationBinaryESBM.R`
+
+Network-only SBM baseline outputs can be combined with:
+
+- `simulation/learn_alpha/2_processSBMresults.R`
+
+These processing scripts compute posterior summaries and clustering diagnostics, including:
+
+- posterior similarity matrices
+- SALSO point estimates
+- adjusted Rand index (ARI)
+- silhouette summaries based on `1 - PSM`
+
+## Notes
+
+This is still a research codebase rather than a polished R package. The simulation and plotting pipelines are active, but documentation and automated testing are lighter than the core methodology work.

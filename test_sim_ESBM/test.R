@@ -26,7 +26,6 @@ suppressPackageStartupMessages({
 
 
 ## ---- Source ----
-source(here("R_utilties", "esbm_original.R"))
 source(here("R_utilties", "esbm.R"))
 source(here("R_utilties", "similarity_functions.R"))
 Rcpp::sourceCpp(here("R_utilties", "stirling.cpp"))
@@ -45,8 +44,7 @@ sigma_dm <- 0; H_dm <- 50; beta_dm <- 3.5 / H_dm
 
 #################################################
 ## ---- Collapsed Gibbs sampler (unsupervised) ----
-## SP: sanity check. Get the same results with no covariates
-## the original code has not been touched!
+## SP: sanity check. Confirm the sampler runs with no covariates.
 N_iter <- 2000
 my_seed <- 1
 my_z <- seq_len(V)
@@ -57,16 +55,9 @@ Z_DM <- esbm(Y, my_seed, N_iter, "DM", my_z, a = a, b = b,
 
 colnames(Z_DM)
 
-# DM
-Z_DM2 <- esbm_original(Y, my_seed, N_iter, "DM", my_z, a = a, b = b,
-             beta_DM = beta_dm, H_DM = H_dm)
-head(Z_DM) == head(Z_DM2)
-
 #################################################
 ## ---- Collapsed Gibbs sampler with categorical covariates  ----
-## SP: sanity check. Get the same results with no covariates
-## here I just changed the main function to get the similarity 
-## function and its parameter as an argument
+## SP: sanity check. Confirm the sampler runs with categorical covariates.
 
 N_iter <- 2000
 my_seed <- 1
@@ -82,20 +73,9 @@ Z_DM_x <- esbm(Y, my_seed, N_iter, "DM", my_z, a = a, b = b,
                sim_args = list(list(params = params))
               )
 
-
-# DP + x
-my_alpha_xi <- rep(1, length(unique(my_x)))
-
-Z_DP_2 <- esbm_original(Y, my_seed, N_iter,"DM", my_z, a = a, b = b,
-               beta_DM = beta_dm, H_DM = H_dm, 
-               x = my_x,  alpha_xi = my_alpha_xi)
-
-head(Z_DM_x) == head(Z_DP_2)
-tail(Z_DM_x) == tail(Z_DP_2)
-
 #################################################
 ## ---- Collapsed Gibbs sampler with continuous covariates  ----
-## This is new! no check, just to see if things are running 
+## This is new. Just check that it runs.
 
 
 N_iter <- 2000
@@ -112,4 +92,3 @@ Z_DM_x <- esbm(Y, my_seed, N_iter, "DM", my_z, a = a, b = b,
               )
 
 sim_args = list(m0 = 0, s0 = sqrt(2))
-

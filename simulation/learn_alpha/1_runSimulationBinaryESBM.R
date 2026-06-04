@@ -176,46 +176,55 @@ cat("Done.\n\n")
 ## ------------------------------- ##
 ## Save output
 ## ------------------------------- ##
+base_name <- tools::file_path_sans_ext(basename(data_path))
 
-## ------------------------------- ##
-## Save output
-## ------------------------------- ##
+model_tag <- ifelse(model == "SBM", "SBM", similarity_calibration)
+
 out_dir <- here(
   "simulation",
   "learn_alpha",
-  similarity_calibration,
+  model_tag,
   "results",
   paste0(nCov, "Cov")
 )
 
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-alpha_tag <- sprintf(
-  "cal-%s_init-%s_a-%s_b-%s",
-  similarity_calibration,
-  gsub("\\.", "p", sprintf("%.2f", alpha_init)),
-  gsub("\\.", "p", sprintf("%.2f", a_alpha)),
-  gsub("\\.", "p", sprintf("%.2f", b_alpha))
-)
-
-base_name <- tools::file_path_sans_ext(basename(data_path))
-
-out_file <- file.path(out_dir,
-  sprintf(
-    "post_%s_alphaLearn-%s_seed-%d.rds",
-    base_name, alpha_tag, seed
+if (model == "SBM") {
+  out_name <- sprintf(
+    "postSBM_%s_seed-%d.rds",
+    base_name,
+    seed
   )
-)
+} else {
+  alpha_tag <- sprintf(
+    "cal-%s_init-%s_a-%s_b-%s",
+    similarity_calibration,
+    gsub("\\.", "p", sprintf("%.2f", alpha_init)),
+    gsub("\\.", "p", sprintf("%.2f", a_alpha)),
+    gsub("\\.", "p", sprintf("%.2f", b_alpha))
+  )
+
+  out_name <- sprintf(
+    "post_%s_alphaLearn-%s_seed-%d.rds",
+    base_name,
+    alpha_tag,
+    seed
+  )
+}
+
+out_file <- file.path(out_dir, out_name)
 
 saveRDS(
   list(
-    mcmcpost   = mcmcpost,
-    file       = data_path,
-    alpha_g    = alpha_spec,
-    seed       = seed,
-    scenario   = scenario,
-    nCov       = nCov,
-    N_iter     = N_iter
+    mcmcpost = mcmcpost,
+    file     = data_path,
+    alpha_g  = alpha_spec,
+    seed     = seed,
+    scenario = scenario,
+    nCov     = nCov,
+    N_iter   = N_iter,
+    model    = model
   ),
   file = out_file
 )
