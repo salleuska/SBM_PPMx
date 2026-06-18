@@ -59,6 +59,7 @@ if (length(processed_files) == 0) {
 ## ------------------------------------------------------------
 scenario_caption <- "N = neutral, I = informative, M = misleading"
 
+## ESBM results (learned alpha, with covariate)
 extract_df <- function(f) {
 
   obj <- readRDS(f)
@@ -97,6 +98,7 @@ extract_df <- function(f) {
         a_alpha = r$alpha_g$a_alpha,
         b_alpha = r$alpha_g$b_alpha,
         prior = paste0("Gamma(", r$alpha_g$a_alpha, ",", r$alpha_g$b_alpha, ")"),
+        model = "ESBM",
 
         alpha_mean = mean(alpha_vec, na.rm = TRUE),
         alpha_lwr = quantile(alpha_vec, 0.025, na.rm = TRUE),
@@ -117,24 +119,93 @@ extract_df <- function(f) {
   do.call(rbind, out)
 }
 
+## SBM baseline (no covariate)
+extract_df_sbm <- function(f) {
+
+  obj <- readRDS(f)
+
+  sim_name <- file_path_sans_ext(basename(f))
+  sim_name <- sub("_results$", "", sim_name)
+
+  nCov <- as.integer(sub("^binarySBM_([0-9]+)cov_[A-Z]+$", "\\1", sim_name))
+  scenario <- sub("^binarySBM_[0-9]+cov_([A-Z]+)$", "\\1", sim_name)
+
+  out <- lapply(names(obj$results), function(nm) {
+
+    r <- obj$results[[nm]]
+
+    ARI_vec <- apply(r$Z_post, 2,
+      function(z_t) mclust::adjustedRandIndex(z_t, obj$sim$partition_true)
+    )
+
+    data.frame(
+      sim_name       = sim_name,
+      nCov           = nCov,
+      scenario_label = scenario,
+      covariate      = NA_character_,
+      tag            = nm,
+      seed           = r$seed,
+      a_alpha        = NA_real_,
+      b_alpha        = NA_real_,
+      prior          = "SBM (no covariate)",
+      model          = "SBM",
+
+      alpha_mean     = NA_real_,
+      alpha_lwr      = NA_real_,
+      alpha_upr      = NA_real_,
+
+      ARI_vi         = r$ARI_vi,
+      ARI_mean       = mean(ARI_vec, na.rm = TRUE),
+      ARI_lwr        = quantile(ARI_vec, 0.025, na.rm = TRUE),
+      ARI_upr        = quantile(ARI_vec, 0.975, na.rm = TRUE),
+
+      silhouette     = r$silhouette$mean
+    )
+  })
+
+  do.call(rbind, out)
+}
+
 ## ------------------------------------------------------------
 ## Build plotting data
 ## ------------------------------------------------------------
 
+## ESBM
 df <- do.call(rbind, lapply(processed_files, extract_df))
 
+## SBM baseline
+sbm_processed_root <- here("simulation", "learn_alpha", "SBM", "results", "processed")
+sbm_files <- list.files(
+  sbm_processed_root,
+  pattern = "^binarySBM_[0-9]+cov_[A-Z]+_results\\.rds$",
+  recursive = TRUE,
+  full.names = TRUE
+)
+
+if (length(sbm_files) > 0) {
+  df_sbm <- do.call(rbind, lapply(sbm_files, extract_df_sbm))
+} else {
+  warning("No SBM processed files found in: ", sbm_processed_root,
+          "\nRun 2_processSBMresults.R first.")
+  df_sbm <- df[0, ]   # empty frame with same columns
+}
+
 if (!is.null(nCov_plot)) {
-  df <- subset(df, nCov == nCov_plot)
+  df      <- subset(df,     nCov == nCov_plot)
+  df_sbm  <- subset(df_sbm, nCov == nCov_plot)
 }
 
 if (nrow(df) == 0) {
-  stop("No results found for requested nCov.")
+  stop("No ESBM results found for requested nCov.")
 }
 
-df$scenario_label <- factor(
-  df$scenario_label,
-  levels = unique(df$scenario_label[order(df$nCov, df$scenario)])
-)
+## combined for ARI plot
+df_all <- rbind(df, df_sbm)
+
+## shared factor levels (scenario ordering by nCov)
+scen_levels <- unique(df$scenario_label[order(df$nCov, df$scenario_label)])
+df$scenario_label     <- factor(df$scenario_label,     levels = scen_levels)
+df_all$scenario_label <- factor(df_all$scenario_label, levels = scen_levels)
 
 nCov_tag <- if (is.null(nCov_plot)) "all" else paste0(nCov_plot, "Cov")
 
@@ -178,23 +249,48 @@ ggsave(
 
 ## ------------------------------------------------------------
 ## ARI plot with 95% posterior credible interval
+## (ESBM points + SBM baseline as line/ribbon)
 ## ------------------------------------------------------------
-df_ari <- df[!duplicated(df$tag), ]
+df_ari_esbm <- df_all[df_all$model == "ESBM" & !duplicated(df_all$tag), ]
+df_ari_sbm  <- df_all[df_all$model == "SBM",  ]
 
-p_ari <- ggplot(df_ari, aes(x = scenario_label, y = ARI_mean)) +
-  geom_point(position = position_dodge(width = 0.5), size = 2.5) +
+p_ari <- ggplot(mapping = aes(x = scenario_label)) +
+  ## SBM baseline: ribbon + dashed line (drawn first, sits behind)
+  geom_ribbon(
+    data = df_ari_sbm,
+    aes(ymin = ARI_lwr, ymax = ARI_upr, group = nCov),
+    fill = "grey60",
+    alpha = 0.25
+  ) +
+  geom_line(
+    data = df_ari_sbm,
+    aes(y = ARI_mean, group = nCov),
+    color = "grey40",
+    linewidth = 0.8,
+    linetype = "dashed"
+  ) +
+  ## ESBM: points + error bars, colored by prior
   geom_errorbar(
-    aes(ymin = ARI_lwr, ymax = ARI_upr),
+    data = df_ari_esbm,
+    aes(ymin = ARI_lwr, ymax = ARI_upr, color = prior),
     position = position_dodge(width = 0.5),
     width = 0.2,
     alpha = 0.7
   ) +
+  geom_point(
+    data = df_ari_esbm,
+    aes(y = ARI_mean, color = prior),
+    position = position_dodge(width = 0.5),
+    size = 2.5
+  ) +
   theme_minimal(base_size = 14) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
   labs(
-    title = "Posterior ARI under learned alpha",
+    title = "Posterior ARI: ESBM vs SBM baseline",
+    subtitle = scenario_caption,
     x = NULL,
-    y = expression(ARI(z, z[0]) ~ "|" ~ data)
+    y = expression(ARI(z, z[0]) ~ "|" ~ data),
+    color = NULL
   ) +
   theme(
     plot.title = element_text(face = "bold"),

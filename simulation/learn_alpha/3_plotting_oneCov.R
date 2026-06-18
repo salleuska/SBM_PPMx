@@ -17,28 +17,35 @@ outDir <- here("simulation", "learn_alpha", similarity_calibration,
 dir.create(outDir, recursive = TRUE, showWarnings = FALSE)
 ################################
 
-## read processed results (1-cov)
+## read processed results (1-cov) — ESBM with learned alpha
 res_neutral <- readRDS(
   here("simulation", "learn_alpha", similarity_calibration, "results", "processed", "oneCov",
        "scenario_1cov_neutral_results.rds")
 )
 
 res_info <- readRDS(
-  here("simulation", "learn_alpha",similarity_calibration, "results", "processed", "oneCov",
+  here("simulation", "learn_alpha", similarity_calibration, "results", "processed", "oneCov",
        "scenario_1cov_informative_results.rds")
 )
 
 res_mis_rand <- readRDS(
-  here("simulation", "learn_alpha", "results", "processed", "oneCov",
+  here("simulation", "learn_alpha", similarity_calibration, "results", "processed", "oneCov",
        "scenario_1cov_mislead_random_results.rds")
- )
+)
+
+## read processed results — SBM baseline (no covariate)
+sbm_dir <- here("simulation", "learn_alpha", "SBM", "results", "processed", "1Cov")
+
+res_sbm_neutral  <- readRDS(file.path(sbm_dir, "binarySBM_1cov_N_results.rds"))
+res_sbm_info     <- readRDS(file.path(sbm_dir, "binarySBM_1cov_I_results.rds"))
+res_sbm_mis_rand <- readRDS(file.path(sbm_dir, "binarySBM_1cov_M_results.rds"))
 
 ################################
 extract_df <- function(obj, scen_name) {
   out <- lapply(names(obj$results), function(nm) {
     r <- obj$results[[nm]]
     alpha_vec <- as.numeric(r$alpha_post)
-    
+
     data.frame(
       scenario = scen_name,
       tag = nm,
@@ -53,21 +60,65 @@ extract_df <- function(obj, scen_name) {
       ARI_vi = r$ARI_vi,
       ARI_mean = r$ARI_mean,
       ARI_sd = r$ARI_sd,
-      silhouette = r$silhouette$mean
+      silhouette = r$silhouette$mean,
+      model = "ESBM"
     )
   })
 
   do.call(rbind, out)
 }
+
+## SBM baseline extractor (no alpha info)
+extract_df_sbm <- function(obj, scen_name) {
+  out <- lapply(names(obj$results), function(nm) {
+    r <- obj$results[[nm]]
+    data.frame(
+      scenario   = scen_name,
+      tag        = nm,
+      seed       = r$seed,
+      a_alpha    = NA_real_,
+      b_alpha    = NA_real_,
+      prior      = "SBM (no covariate)",
+      alpha_mean = NA_real_,
+      alpha_sd   = NA_real_,
+      alpha_lwr  = NA_real_,
+      alpha_upr  = NA_real_,
+      ARI_vi     = r$ARI_vi,
+      ARI_mean   = r$ARI_mean,
+      ARI_sd     = r$ARI_sd,
+      silhouette = r$silhouette$mean,
+      model      = "SBM"
+    )
+  })
+  do.call(rbind, out)
+}
 #############################################################################
 ## Overall clustering results as a function of alpha
 #############################################################################
-df <- rbind(
+
+## ESBM results (learned alpha, with covariate)
+df_esbm <- rbind(
   extract_df(res_neutral,   "neutral"),
-  extract_df(res_info,      "informative")
+  extract_df(res_info,      "informative"),
   extract_df(res_mis_rand,  "misleading")
 )
 
+## SBM baseline (no covariate)
+df_sbm <- rbind(
+  extract_df_sbm(res_sbm_neutral,   "neutral"),
+  extract_df_sbm(res_sbm_info,      "informative"),
+  extract_df_sbm(res_sbm_mis_rand,  "misleading")
+)
+
+## combined (used for ARI plot)
+df_all <- rbind(df_esbm, df_sbm)
+df_all$scenario <- factor(
+  df_all$scenario,
+  levels = c("neutral", "informative", "misleading")
+)
+
+## ESBM-only (used for alpha plot)
+df <- df_esbm
 df$scenario <- factor(
   df$scenario,
   levels = c("neutral", "informative", "misleading")
@@ -96,7 +147,7 @@ p_alpha <- ggplot(df, aes(x = scenario, y = alpha_mean, color = prior)) +
 p_alpha
 
 ggsave(file.path(outDir, "posterior_alpha_1cov.pdf"), p_alpha, width = 7, height = 4)
-p_ari <- ggplot(df, aes(x = scenario, y = ARI_mean, color = prior)) +
+p_ari <- ggplot(df_all, aes(x = scenario, y = ARI_mean, color = prior, shape = model)) +
   geom_point(position = position_dodge(width = 0.5), size = 2.5) +
   geom_errorbar(
     aes(ymin = ARI_mean - ARI_sd, ymax = ARI_mean + ARI_sd),
@@ -104,12 +155,14 @@ p_ari <- ggplot(df, aes(x = scenario, y = ARI_mean, color = prior)) +
     width = 0.2,
     alpha = 0.7
   ) +
+  scale_shape_manual(values = c("ESBM" = 16, "SBM" = 17)) +
   theme_minimal(base_size = 14) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
   labs(
-    title = "Posterior mean ARI under learned alpha",
+    title = "Posterior mean ARI: ESBM vs SBM baseline",
     x = NULL,
-    y = expression(E(ARI(z, z[0]) ~ "|" ~ data))
+    y = expression(E(ARI(z, z[0]) ~ "|" ~ data)),
+    shape = NULL
   ) +
   theme(
     plot.title = element_text(face = "bold"),
