@@ -86,7 +86,12 @@ for (f in files_all) {
   cat("Processing:", basename(f), "\n")
   res <- readRDS(f)
 
-  Z_post <- res$Z_post
+  # handle both old (bare matrix) and new (list with $z_post) esbm return structures
+  if (is.list(res$Z_post) && !is.null(res$Z_post$z_post)) {
+    Z_post <- res$Z_post$z_post
+  } else {
+    Z_post <- res$Z_post
+  }
   if (is.null(Z_post)) stop("Missing Z_post in: ", f)
 
   # must match n after isolate removal
@@ -95,13 +100,14 @@ for (f in files_all) {
          "\n  nrow(Z_post)=", nrow(Z_post), " nrow(Y_app)=", nrow(Y_app))
   }
 
-  # alphas: assume saved as numeric length 3
-  if (is.null(res$alpha) || length(res$alpha) < 3) {
-    stop("Missing/invalid res$alpha (need length 3) in: ", basename(f))
+  # alphas: support both old (res$alpha) and new (res$alpha_g numeric vec) field names
+  alpha_vec <- if (!is.null(res$alpha)) res$alpha else if (is.numeric(res$alpha_g)) res$alpha_g else NULL
+  if (is.null(alpha_vec) || length(alpha_vec) < 3) {
+    stop("Missing/invalid alpha (need length 3) in: ", basename(f))
   }
-  alpha_x <- as.numeric(res$alpha[1])
-  alpha_y <- as.numeric(res$alpha[2])
-  alpha_z <- as.numeric(res$alpha[3])
+  alpha_x <- as.numeric(alpha_vec[1])
+  alpha_y <- as.numeric(alpha_vec[2])
+  alpha_z <- as.numeric(alpha_vec[3])
 
   seed   <- if (!is.null(res$seed))   res$seed   else NA_integer_
   N_iter <- if (!is.null(res$N_iter)) res$N_iter else NA_integer_
@@ -135,7 +141,7 @@ for (f in files_all) {
 
   combined$results[[tag]] <- list(
     file        = f,
-    alpha       = c(alpha_x, alpha_y, alpha_z),
+    alpha       = c(alpha_x, alpha_y, alpha_z),   # fixed alpha values
     seed        = seed,
     N_iter      = N_iter,
     z_hat       = z_hat,
