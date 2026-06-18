@@ -17,18 +17,35 @@ if (is.null(args$data_path)) {
 seed   <- if (is.null(args$seed)) 123 else as.integer(args$seed) + 1000
 N_iter <- if (is.null(args$N_iter)) 10000 else as.integer(args$N_iter)
 
-alpha_x <- if (is.null(args$alpha_x)) 1 else as.numeric(args$alpha_x)
-alpha_y <- if (is.null(args$alpha_y)) 1 else as.numeric(args$alpha_y)
-alpha_z <- if (is.null(args$alpha_z)) 1 else as.numeric(args$alpha_z)
+# learn_alpha: if TRUE, place a Gamma prior on alpha and learn it;
+#              if FALSE (default), use fixed alpha_x/alpha_y/alpha_z grid values.
+learn_alpha <- if (is.null(args$learn_alpha)) FALSE else as.logical(args$learn_alpha)
+
+if (learn_alpha) {
+  alpha_init <- if (is.null(args$alpha_init)) 1   else as.numeric(args$alpha_init)
+  a_alpha    <- if (is.null(args$a_alpha))    2   else as.numeric(args$a_alpha)
+  b_alpha    <- if (is.null(args$b_alpha))    1   else as.numeric(args$b_alpha)
+} else {
+  alpha_x <- if (is.null(args$alpha_x)) 1 else as.numeric(args$alpha_x)
+  alpha_y <- if (is.null(args$alpha_y)) 1 else as.numeric(args$alpha_y)
+  alpha_z <- if (is.null(args$alpha_z)) 1 else as.numeric(args$alpha_z)
+}
 
 # Always drop isolated nodes
 drop_isolates <- TRUE
 
 cat("Running ESBM (brain application) with:\n")
 cat("  file          =", data_path, "\n")
-cat("  alpha_x =", alpha_x, "\n")
-cat("  alpha_y =", alpha_y, "\n")
-cat("  alpha_z =", alpha_z, "\n\n")
+cat("  learn_alpha   =", learn_alpha, "\n")
+if (learn_alpha) {
+  cat("  alpha_init =", alpha_init, "\n")
+  cat("  a_alpha    =", a_alpha, "\n")
+  cat("  b_alpha    =", b_alpha, "\n\n")
+} else {
+  cat("  alpha_x =", alpha_x, "\n")
+  cat("  alpha_y =", alpha_y, "\n")
+  cat("  alpha_z =", alpha_z, "\n\n")
+}
 cat("  seed          =", seed, "\n")
 cat("  N_iter        =", N_iter, "\n")
 cat("  covariates    = x, y, z (all)\n")
@@ -111,8 +128,17 @@ sim_args <- list(
   list(m0 = 0, s0 = sqrt(1))
 )
 
-#  provide three alphas
-alpha_vec <- c(alpha_x, alpha_y, alpha_z)
+#  build alpha_g: fixed vector or learned list
+if (learn_alpha) {
+  alpha_g <- list(
+    init    = alpha_init,
+    a_alpha = a_alpha,
+    b_alpha = b_alpha
+  )
+} else {
+  alpha_g <- c(alpha_x, alpha_y, alpha_z)
+}
+
 ## ------------------------------- ##
 ## Run ESBM
 ## ------------------------------- ##
@@ -122,15 +148,14 @@ Z_post <- esbm(
   Y              = Y,
   seed           = seed,
   N_iter         = N_iter,
-  prior          = "GN",
-  z_init         = rep(1, nrow(Y)),   # safe default for GN
+  prior          = list(name = "GN", gamma_GN = gamma_GN),
+  z_init         = rep(1, nrow(Y)),
   a              = a,
   b              = b,
-  gamma_GN       = gamma_GN,
   x              = x_df,
   similarity_fun = similarity_fun,
   sim_args       = sim_args,
-  alpha_g        = alpha_vec
+  alpha_g        = alpha_g
 )
 
 cat("Done.\n\n")
@@ -141,13 +166,22 @@ cat("Done.\n\n")
 out_dir <- here("application_brain", "results")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
-alpha_tag <- paste0(
-  "ax-", gsub("\\.", "p", sprintf("%.2f", alpha_x)),
-  "_ay-", gsub("\\.", "p", sprintf("%.2f", alpha_y)),
-  "_az-", gsub("\\.", "p", sprintf("%.2f", alpha_z))
-)
-
 base_name <- file_path_sans_ext(basename(data_path))
+
+if (learn_alpha) {
+  alpha_tag <- sprintf(
+    "alphaLearn_init-%s_a-%s_b-%s",
+    gsub("\\.", "p", sprintf("%.2f", alpha_init)),
+    gsub("\\.", "p", sprintf("%.2f", a_alpha)),
+    gsub("\\.", "p", sprintf("%.2f", b_alpha))
+  )
+} else {
+  alpha_tag <- paste0(
+    "ax-", gsub("\\.", "p", sprintf("%.2f", alpha_x)),
+    "_ay-", gsub("\\.", "p", sprintf("%.2f", alpha_y)),
+    "_az-", gsub("\\.", "p", sprintf("%.2f", alpha_z))
+  )
+}
 
 out_file <- file.path(
   out_dir,
@@ -159,7 +193,8 @@ saveRDS(
   list(
     Z_post        = Z_post,
     file          = data_path,
-    alpha         = alpha_vec,
+    alpha_g       = alpha_g,
+    learn_alpha   = learn_alpha,
     seed          = seed,
     N_iter        = N_iter,
     gamma_GN      = gamma_GN,
