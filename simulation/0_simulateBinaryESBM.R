@@ -130,7 +130,12 @@ plot_network_geo <- function(sim_obj, main = NULL) {
     diag = FALSE
   )
 
-  layout_xy <- as.matrix(x)   # use (x1, x2) as coordinates
+  # igraph needs a 2-column layout; if only 1 covariate, add jittered y
+  layout_xy <- as.matrix(x)
+  if (ncol(layout_xy) < 2) {
+    layout_xy <- cbind(layout_xy, jitter(rep(0, nrow(layout_xy)), amount = 0.3))
+  }
+  layout_xy <- layout_xy[, 1:2, drop = FALSE]
 
   K    <- length(unique(z))
   pal  <- c(1, 2, 3,4)
@@ -267,7 +272,20 @@ sim_5_MIIII <- add_covariates_SBMsim(
 )
 
 # ------------------------------------------------------------
-# 5) Save
+# 5) 50-covariate scenario: 5 informative, 5 misleading, 40 neutral
+#    Covariate order: x1-x5 informative, x6-x10 misleading, x11-x50 neutral
+# ------------------------------------------------------------
+sim_50_5I5M40N <- add_covariates_SBMsim(
+  base,
+  covDep = c(
+    rep("informative",    5),
+    rep("mislead_random", 5),
+    rep("neutral",        40)
+  )
+)
+
+# ------------------------------------------------------------
+# 6) Save
 # ------------------------------------------------------------
 dir.create(here("simulation/data"), recursive = TRUE, showWarnings = FALSE)
 
@@ -285,6 +303,9 @@ saveRDS(sim_2_MM, here("simulation/data/binarySBM_2cov_MM.rds"))
 saveRDS(sim_5_INNNN, here("simulation/data/binarySBM_5cov_INNNN.rds"))
 saveRDS(sim_5_IMMMM, here("simulation/data/binarySBM_5cov_IMMMM.rds"))
 saveRDS(sim_5_MIIII, here("simulation/data/binarySBM_5cov_MIIII.rds"))
+
+saveRDS(sim_50_5I5M40N,
+        here("simulation/data/binarySBM_50cov_5I5M40N.rds"))
 
 # ------------------------------------------------------------
 # 6) Quick plots
@@ -305,4 +326,6 @@ plot_network_geo(sim_2_MM)
 plot_network_geo(sim_5_INNNN)
 plot_network_geo(sim_5_IMMMM)
 plot_network_geo(sim_5_MIIII)
+
+plot_adj_matrix_gg(sim_50_5I5M40N)
 

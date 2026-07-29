@@ -72,7 +72,7 @@ z0 <- sim_obj$partition
 fname <- tools::file_path_sans_ext(basename(data_path))
 
 scenario <- sub(
-  "^binarySBM_[0-9]+cov_([A-Z]+)$",
+  "^binarySBM_[0-9]+cov_([A-Z0-9]+)$",
   "\\1",
   fname
 )
@@ -82,7 +82,7 @@ if (scenario == fname) {
 }
 
 nCov <- as.integer(sub(
-  "^binarySBM_([0-9]+)cov_[A-Z]+$",
+  "^binarySBM_([0-9]+)cov_[A-Z0-9]+$",
   "\\1",
   fname
 ))

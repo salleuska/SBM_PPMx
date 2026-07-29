@@ -40,7 +40,7 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 get_sim_name <- function(path) {
   sub(
-    "^postSBM_(binarySBM_[0-9]+cov_[A-Z]+)_seed-[0-9]+$",
+    "^postSBM_(binarySBM_[0-9]+cov_[A-Z0-9]+)_seed-[0-9]+$",
     "\\1",
     tools::file_path_sans_ext(basename(path))
   )
@@ -49,7 +49,7 @@ get_sim_name <- function(path) {
 get_nCov <- function(path) {
   as.integer(
     sub(
-      "^.*binarySBM_([0-9]+)cov_[A-Z]+.*$",
+      "^.*binarySBM_([0-9]+)cov_[A-Z0-9]+.*$",
       "\\1",
       basename(path)
     )

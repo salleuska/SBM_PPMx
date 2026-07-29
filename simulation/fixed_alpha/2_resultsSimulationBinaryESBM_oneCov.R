@@ -43,7 +43,7 @@ files_misleading  <- files_all[grepl("1cov_mislead_random", basename(files_all),
 
 cat("Found", length(files_neutral), "files for scenario NEUTRAL\n")
 cat("Found", length(files_info), "files for scenario INFO \n")
-cat("Found", length(files_misleading), "files for scenario mis_rand\n")
+cat("Found", length(files_misleading), "files for scenario MISLEADING\n")
 
 res_for_scenario <- function(sim_path, scenario_files) {
 
@@ -138,8 +138,8 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ##---------------------------------------------------------##
 combined_neutral   <- res_for_scenario(sim_path_neutral,   files_neutral)
 combined_info      <- res_for_scenario(sim_path_info,      files_info)
-combined_misleading  <- res_for_scenario(sim_path_mis_rand,  files_mis_rand)
+combined_misleading  <- res_for_scenario(sim_path_misleading,  files_misleading)
 
 saveRDS(combined_neutral,   file.path(out_dir, "scenario_1cov_neutral_results.rds"))
 saveRDS(combined_info,      file.path(out_dir, "scenario_1cov_informative_results.rds"))
-saveRDS(combined_misleading,  file.path(out_dir, "scenario_1cov_mislead_results.rds"))
+saveRDS(combined_misleading,  file.path(out_dir, "scenario_1cov_mislead_random_results.rds"))

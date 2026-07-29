@@ -29,11 +29,6 @@ res_mis_rand <- readRDS(
   here("simulation", "fixed_alpha", "results", "processed", "oneCov",
        "scenario_1cov_mislead_random_results.rds")
 )
-
-# res_mis_shift <- readRDS(
-#   here("simulation", "fixed_alpha", "results", "processed", "oneCov",
-#        "scenario_1cov_mislead_shifted_results.rds")
-# )
 ################################
 extract_df <- function(obj, scen_name) {
   alphas <- names(obj$results)
@@ -55,7 +50,6 @@ df <- rbind(
   extract_df(res_neutral,   "neutral"),
   extract_df(res_info,      "informative"),
   extract_df(res_mis_rand,  "misleading")
-#  extract_df(res_mis_shift, "mislead_shifted")
 )
 
 ## (optional) drop alpha = 4 if present

@@ -45,7 +45,7 @@ cat("nCov plot:", ifelse(is.null(nCov_plot), "all", nCov_plot), "\n\n")
 
 processed_files <- list.files(
   processed_root,
-  pattern = "^binarySBM_[0-9]+cov_[A-Z]+_results\\.rds$",
+  pattern = "^binarySBM_[0-9]+cov_[A-Z0-9]+_results\\.rds$",
   recursive = TRUE,
   full.names = TRUE
 )
@@ -67,8 +67,8 @@ extract_df <- function(f) {
   sim_name <- file_path_sans_ext(basename(f))
   sim_name <- sub("_results$", "", sim_name)
 
-  nCov <- as.integer(sub("^binarySBM_([0-9]+)cov_[A-Z]+$", "\\1", sim_name))
-  scenario <- sub("^binarySBM_[0-9]+cov_([A-Z]+)$", "\\1", sim_name)
+  nCov <- as.integer(sub("^binarySBM_([0-9]+)cov_[A-Z0-9]+$", "\\1", sim_name))
+  scenario <- sub("^binarySBM_[0-9]+cov_([A-Z0-9]+)$", "\\1", sim_name)
 
   out <- lapply(names(obj$results), function(nm) {
 
@@ -127,8 +127,8 @@ extract_df_sbm <- function(f) {
   sim_name <- file_path_sans_ext(basename(f))
   sim_name <- sub("_results$", "", sim_name)
 
-  nCov <- as.integer(sub("^binarySBM_([0-9]+)cov_[A-Z]+$", "\\1", sim_name))
-  scenario <- sub("^binarySBM_[0-9]+cov_([A-Z]+)$", "\\1", sim_name)
+  nCov <- as.integer(sub("^binarySBM_([0-9]+)cov_[A-Z0-9]+$", "\\1", sim_name))
+  scenario <- sub("^binarySBM_[0-9]+cov_([A-Z0-9]+)$", "\\1", sim_name)
 
   out <- lapply(names(obj$results), function(nm) {
 
@@ -177,7 +177,7 @@ df <- do.call(rbind, lapply(processed_files, extract_df))
 sbm_processed_root <- here("simulation", "learn_alpha", "SBM", "results", "processed")
 sbm_files <- list.files(
   sbm_processed_root,
-  pattern = "^binarySBM_[0-9]+cov_[A-Z]+_results\\.rds$",
+  pattern = "^binarySBM_[0-9]+cov_[A-Z0-9]+_results\\.rds$",
   recursive = TRUE,
   full.names = TRUE
 )
@@ -384,7 +384,7 @@ for (f in processed_files) {
   sim_name <- file_path_sans_ext(basename(f))
   sim_name <- sub("_results$", "", sim_name)
 
-  this_nCov <- as.integer(sub("^binarySBM_([0-9]+)cov_[A-Z]+$", "\\1", sim_name))
+  this_nCov <- as.integer(sub("^binarySBM_([0-9]+)cov_[A-Z0-9]+$", "\\1", sim_name))
 
   if (!is.null(nCov_plot) && this_nCov != nCov_plot) next
 
