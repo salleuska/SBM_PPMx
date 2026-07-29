@@ -62,6 +62,13 @@ df$scenario <- factor(
 
 df <- df[order(df$scenario, df$alpha), ]
 
+## shared palette for the 3 scenarios (matches slide deck accent colors)
+scenario_colors <- c(
+  "informative" = "#A8556B",  # rose
+  "neutral"     = "#5B6FA6",  # indigo
+  "misleading"  = "#2B2B2E"   # ink (dark, signals "handle with care")
+)
+
 ### Plot of average ARI (+/- SD)
 p_ari_mean <- ggplot(df, aes(x = alpha, y = ARI_mean, color = scenario)) +
   geom_line(linewidth = 1) +
@@ -69,6 +76,7 @@ p_ari_mean <- ggplot(df, aes(x = alpha, y = ARI_mean, color = scenario)) +
   geom_errorbar(aes(ymin = ARI_mean - ARI_sd,
                     ymax = ARI_mean + ARI_sd),
                 width = 0.1, alpha = 0.6) +
+  scale_color_manual(values = scenario_colors) +
   theme_minimal(base_size = 14) +
   scale_x_continuous(breaks = sort(unique(df$alpha))) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
@@ -95,6 +103,7 @@ ggsave(
 p_ari_vi <- ggplot(df, aes(x = alpha, y = ARI_vi, color = scenario)) +
   geom_line(linewidth = 1) +
   geom_point(size = 3) +
+  scale_color_manual(values = scenario_colors) +
   theme_minimal(base_size = 14) +
   scale_x_continuous(breaks = sort(unique(df$alpha))) +
   scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
@@ -115,6 +124,7 @@ ggsave(file.path(outDir, "ARI_trueVsEstimated_1cov.pdf"), p_ari_vi, width = 7, h
 p_sil <- ggplot(df, aes(x = alpha, y = silhouette, color = scenario)) +
   geom_point(size = 3) +
   geom_line(linewidth = 1) +
+  scale_color_manual(values = scenario_colors) +
   theme_minimal(base_size = 14) +
   scale_x_continuous(breaks = sort(unique(df$alpha))) +
   labs(
