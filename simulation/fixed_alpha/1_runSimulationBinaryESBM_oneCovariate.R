@@ -63,10 +63,8 @@ if (grepl("1cov_neutral", fname, ignore.case = TRUE)) {
   scenario <- "informative"
 } else if (grepl("1cov_mislead_random", fname, ignore.case = TRUE)) {
   scenario <- "mislead_random"
-} else if (grepl("1cov_mislead_shifted", fname, ignore.case = TRUE)) {
-  scenario <- "mislead_shifted"
 } else {
-  stop("Filename must contain one of: 1cov_neutral / 1cov_informative / 1cov_mislead_random / 1cov_mislead_shifted. Found: ", fname)
+  stop("Filename must contain one of: 1cov_neutral / 1cov_informative / 1cov_mislead_random. Found: ", fname)
 }
 
 cat("Scenario:", scenario, "\n\n")
