@@ -1,8 +1,8 @@
 ##---------------------------##------------------##
-## Process ESBM results for binary SBM simulation
-##- Reads all post_*.rds in results folder
+## Process ESBM results for binary SBM simulation (one covariate)
+##- Reads all postOneCov_*.rds in results folder
 ##- For each:
-##     * estimate the partition using salso 
+##     * estimate the partition using salso
 ##     * computes ARI vs true partition
 ##     * records scenario, alpha, seed, K_hat
 ##---------------------------##------------------##
@@ -11,25 +11,38 @@ library(mclust)     # ARI
 library(tools)      # file_path_sans_ext
 library(salso)      # point estimate for the clustering
 library(cluster)    # to compute silhouette
+
+args <- R.utils::commandArgs(asValue = TRUE)
+
 ##---------------------------##
 ## Settings
 ##---------------------------##
 
+## Only results run with this calibration are processed. Runs produced before
+## the calibration tag existed used the sampler default ("normalized") and are
+## therefore ignored here.
+similarity_calibration <- if (is.null(args$similarity_calibration)) {
+  "raw"
+} else {
+  as.character(args$similarity_calibration)
+}
+
 ## Paths to results directory and simulation files
 results_dir <- here("simulation", "fixed_alpha", "results", "oneCov")
-sim_path_neutral   <- here("simulation", "data", "binarySBM_1cov_N.rds")
-sim_path_info      <- here("simulation", "data", "binarySBM_1cov_I.rds")
-sim_path_misleading  <- here("simulation", "data", "binarySBM_1cov_M.rds")
+data_dir    <- here("simulation", "data")
+
+## 1-cov scenarios: N = neutral, I = informative, M = misleading
+scenarios <- c("N", "I", "M")
 
 ## MCMC
-burn_frac <- 0.4 # brunin
+burn_frac <- 0.4 # burnin
 thin_step <- 1   # eventual thinning
 
-
-files_res   <- list.files(results_dir, pattern = "^postOneCov_.*\\.rds$", full.names = TRUE)
+cat("Results dir :", results_dir, "\n")
+cat("Calibration :", similarity_calibration, "\n\n")
 
 ##---------------------------------------------------------##
-## List files and split by scenario keyword
+## List files and split by scenario code
 ##---------------------------------------------------------##
 files_all <- list.files(
   results_dir,
@@ -37,13 +50,21 @@ files_all <- list.files(
   full.names = TRUE
 )
 
-files_neutral   <- files_all[grepl("1cov_neutral",   basename(files_all), ignore.case = TRUE)]
-files_info      <- files_all[grepl("1cov_informative", basename(files_all), ignore.case = TRUE)]
-files_misleading  <- files_all[grepl("1cov_mislead_random", basename(files_all), ignore.case = TRUE)]
+files_for_scenario <- function(code) {
+  pat <- sprintf(
+    "^postOneCov_binarySBM_1cov_%s_cal-%s_alpha-",
+    code, similarity_calibration
+  )
+  files_all[grepl(pat, basename(files_all))]
+}
 
-cat("Found", length(files_neutral), "files for scenario NEUTRAL\n")
-cat("Found", length(files_info), "files for scenario INFO \n")
-cat("Found", length(files_misleading), "files for scenario MISLEADING\n")
+scenario_files <- lapply(scenarios, files_for_scenario)
+names(scenario_files) <- scenarios
+
+for (code in scenarios) {
+  cat("Found", length(scenario_files[[code]]), "files for scenario", code, "\n")
+}
+cat("\n")
 
 res_for_scenario <- function(sim_path, scenario_files) {
 
@@ -51,7 +72,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
   sim_obj <- readRDS(sim_path)
   z_true  <- sim_obj$partition
 
-  ## prepare combined structure - info form simulation
+  ## prepare combined structure - info from simulation
   combined <- list(
     sim = list(
       Y              = sim_obj$Y,
@@ -60,9 +81,9 @@ res_for_scenario <- function(sim_path, scenario_files) {
       block_probs    = sim_obj$block_probs,
       clust_sizes    = sim_obj$clust_sizes,
       nCov           = sim_obj$nCov,
-      cov1Dep        = sim_obj$cov1Dep,
-      cov2Dep        = sim_obj$cov2Dep
+      covDep         = sim_obj$covDep
     ),
+    similarity_calibration = similarity_calibration,
     results = list()   # ONLY results grouped by alpha
   )
 
@@ -88,9 +109,9 @@ res_for_scenario <- function(sim_path, scenario_files) {
     ## PSM
     psm_mat <- psm(t(Z_keep))
 
-    ## estimate of the clusering using VI 
+    ## estimate of the clustering using VI
     z_hat <- salso(t(Z_keep), loss = VI())
-    
+
     ## ARI for VI representative
     ARI_vi <- adjustedRandIndex(z_hat, z_true)
 
@@ -102,7 +123,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
     ARI_mean <- mean(ARI_iter)
     ARI_sd   <- sd(ARI_iter)
 
-    ## silhouette (distance = 1 − PSM)
+    ## silhouette (distance = 1 - PSM)
     diss_mat <- 1 - psm_mat
     sil_obj  <- silhouette(z_hat, dist(diss_mat))
     sil_mean <- mean(sil_obj[, 3])
@@ -119,7 +140,8 @@ res_for_scenario <- function(sim_path, scenario_files) {
       silhouette  = list(object = sil_obj, mean = sil_mean),
       psm         = psm_mat,
       seed        = seed,
-      N_iter      = N_iter
+      N_iter      = N_iter,
+      similarity_calibration = res$similarity_calibration
     )
   }
 
@@ -128,18 +150,25 @@ res_for_scenario <- function(sim_path, scenario_files) {
 }
 
 ##---------------------------------------------------------##
-## Build res & save for seach scenarion
+## Build res & save for each scenario
 ##---------------------------------------------------------##
 out_dir <- here("simulation", "fixed_alpha", "results", "processed", "oneCov")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-##---------------------------------------------------------##
-## Build combined objects (one-cov scenarios)
-##---------------------------------------------------------##
-combined_neutral   <- res_for_scenario(sim_path_neutral,   files_neutral)
-combined_info      <- res_for_scenario(sim_path_info,      files_info)
-combined_misleading  <- res_for_scenario(sim_path_misleading,  files_misleading)
+for (code in scenarios) {
 
-saveRDS(combined_neutral,   file.path(out_dir, "scenario_1cov_neutral_results.rds"))
-saveRDS(combined_info,      file.path(out_dir, "scenario_1cov_informative_results.rds"))
-saveRDS(combined_misleading,  file.path(out_dir, "scenario_1cov_mislead_random_results.rds"))
+  if (length(scenario_files[[code]]) == 0) {
+    warning("No results found for scenario ", code,
+            " with calibration ", similarity_calibration, ". Skipping.")
+    next
+  }
+
+  sim_path <- file.path(data_dir, sprintf("binarySBM_1cov_%s.rds", code))
+
+  combined <- res_for_scenario(sim_path, scenario_files[[code]])
+
+  out_file <- file.path(out_dir, sprintf("binarySBM_1cov_%s_results.rds", code))
+  saveRDS(combined, out_file)
+
+  cat("Saved:", out_file, "\n\n")
+}

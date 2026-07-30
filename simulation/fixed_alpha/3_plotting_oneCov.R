@@ -15,20 +15,17 @@ dir.create(outDir, recursive = TRUE, showWarnings = FALSE)
 ################################
 
 ## read processed results (1-cov)
-res_neutral <- readRDS(
-  here("simulation", "fixed_alpha", "results", "processed", "oneCov",
-       "scenario_1cov_neutral_results.rds")
-)
+## scenario codes: N = neutral, I = informative, M = misleading
+read_scenario <- function(code) {
+  readRDS(
+    here("simulation", "fixed_alpha", "results", "processed", "oneCov",
+         sprintf("binarySBM_1cov_%s_results.rds", code))
+  )
+}
 
-res_info <- readRDS(
-  here("simulation", "fixed_alpha", "results", "processed", "oneCov",
-       "scenario_1cov_informative_results.rds")
-)
-
-res_mis_rand <- readRDS(
-  here("simulation", "fixed_alpha", "results", "processed", "oneCov",
-       "scenario_1cov_mislead_random_results.rds")
-)
+res_neutral  <- read_scenario("N")
+res_info     <- read_scenario("I")
+res_mis_rand <- read_scenario("M")
 ################################
 extract_df <- function(obj, scen_name) {
   alphas <- names(obj$results)
@@ -227,7 +224,7 @@ p05 <- cowplot::ggdraw() +
                       fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
   cowplot::draw_plot(p05[[4]], x = 0, y = 0, width = 1, height = 0.92)
 
-ggsave(file.path(outDir, "psm_neutral_alpha05.pdf"), p05, width = 6, height = 6)
+ggsave(file.path(outDir, "psm_informative_alpha05.pdf"), p05, width = 6, height = 6)
 
 alpha1 <- res_info$results$alpha_1.00
 p1 <- plot_psm_with_annotations(

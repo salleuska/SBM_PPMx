@@ -16,7 +16,7 @@ suppressPackageStartupMessages({
 ## ------------------------------- ##
 args <- R.utils::commandArgs(asValue = TRUE)
 
-# data_path  (REQUIRED)
+# data_path  
 if (is.null(args$data_path)) {
   stop("Please provide data_path=path/to/simulated.rds")
 } else {
@@ -43,6 +43,16 @@ if (is.null(args$N_iter)) {
 } else {
   N_iter <- as.integer(args$N_iter)
 }
+
+## Similarity calibration: "raw" leaves log g() unstandardized (default here).
+## "normalized" subtracts a log-sum-exp from log g() at every node update.
+similarity_calibration <- if (is.null(args$similarity_calibration)) {
+  "raw"
+} else {
+  as.character(args$similarity_calibration)
+}
+
+cat("  calibration =", similarity_calibration, "\n")
 
 ## ------------------------------- ##
 ## Source ESBM code
@@ -72,20 +82,19 @@ z0 <- sim_obj$partition
 
 ## ------------------------------- ##
 ## Infer scenario from file name
+## Expected: binarySBM_2cov_<CODE>.rds, one letter per covariate
+##   N = neutral, I = informative, M = misleading
 ## ------------------------------- ##
-fname <- basename(data_path)
+fname <- file_path_sans_ext(basename(data_path))
 
-if (grepl("2cov_NN", fname, ignore.case = TRUE)) {
-  scenario <- "NN"
-} else if (grepl("2cov_IN", fname, ignore.case = TRUE)) {
-  scenario <- "IN"
-} else if (grepl("2cov_NI", fname, ignore.case = TRUE)) {
-  scenario <- "NI"
-} else if (grepl("2cov_II", fname, ignore.case = TRUE)) {
-  scenario <- "II"
-} else {
-  stop("Cannot infer two-cov scenario from file name: ", fname,
-       "\nExpected it to include one of: 2cov_NN / 2cov_IN / 2cov_NI / 2cov_II.")
+scenario <- sub("^binarySBM_2cov_([A-Z]{2})$", "\\1", fname)
+
+valid_scenarios <- c("NN", "IN", "II", "MN", "MI", "MM")
+
+if (scenario == fname || !scenario %in% valid_scenarios) {
+  stop("Cannot infer two-cov scenario from file name: ", basename(data_path),
+       "\nExpected binarySBM_2cov_<CODE>.rds with CODE in: ",
+       paste(valid_scenarios, collapse = " / "), ".")
 }
 
 cat("Simulation scenario =", scenario, "\n\n")
@@ -135,7 +144,8 @@ mcmcpost <- esbm(
   x         = x_df,
   similarity_fun = similarity_fun,
   sim_args       = sim_args,
-  alpha_g        = alpha_g_vec
+  alpha_g        = alpha_g_vec,
+  similarity_calibration = similarity_calibration
 )
 
 cat("Sampler finished.\n\n")
@@ -152,8 +162,8 @@ base_name <- file_path_sans_ext(basename(data_path))
 
 out_file <- file.path(
   out_dir,
-  sprintf("postTwoCov_%s_a1-%s_a2-%s_seed-%d.rds",
-          base_name, alpha1_tag, alpha2_tag, seed)
+  sprintf("postTwoCov_%s_cal-%s_a1-%s_a2-%s_seed-%d.rds",
+          base_name, similarity_calibration, alpha1_tag, alpha2_tag, seed)
 )
 
 
@@ -164,7 +174,9 @@ saveRDS(
     alpha   = alpha_g_vec,
     N_iter  = N_iter,
     scenario= scenario,
-    seed = seed
+    nCov    = 2L,
+    seed = seed,
+    similarity_calibration = similarity_calibration
   ),
   file = out_file
 )

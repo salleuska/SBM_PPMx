@@ -19,11 +19,20 @@ alpha_in <- if (is.null(args$alpha)) 1 else as.numeric(args$alpha)
 seed     <- if (is.null(args$seed)) 123 else as.integer(args$seed)
 N_iter   <- if (is.null(args$N_iter)) 10000 else as.integer(args$N_iter)
 
+## Similarity calibration: "raw" leaves log g() unstandardized (default here).
+## "normalized" subtracts a log-sum-exp from log g() at every node update.
+similarity_calibration <- if (is.null(args$similarity_calibration)) {
+  "raw"
+} else {
+  as.character(args$similarity_calibration)
+}
+
 cat("Running ESBM with:\n")
-cat("  file     =", data_path, "\n")
-cat("  alpha    =", alpha_in, "\n")
-cat("  seed     =", seed, "\n")
-cat("  N_iter   =", N_iter, "\n\n")
+cat("  file        =", data_path, "\n")
+cat("  alpha       =", alpha_in, "\n")
+cat("  calibration =", similarity_calibration, "\n")
+cat("  seed        =", seed, "\n")
+cat("  N_iter      =", N_iter, "\n\n")
 
 ## ------------------------------- ##
 ## Load code
@@ -52,19 +61,17 @@ x  <- sim_obj$x              # matrix n x 2; use only first column for one-cov r
 z0 <- sim_obj$partition
 
 ## ------------------------------- ##
-## Infer scenario 
+## Infer scenario from file name
+## Expected: binarySBM_1cov_<CODE>.rds with CODE in {N, I, M}
+##   N = neutral, I = informative, M = misleading
 ## ------------------------------- ##
-## Infer scenario from filename
-fname <- basename(data_path)
+fname <- file_path_sans_ext(basename(data_path))
 
-if (grepl("1cov_neutral", fname, ignore.case = TRUE)) {
-  scenario <- "neutral"
-} else if (grepl("1cov_informative", fname, ignore.case = TRUE)) {
-  scenario <- "informative"
-} else if (grepl("1cov_mislead_random", fname, ignore.case = TRUE)) {
-  scenario <- "mislead_random"
-} else {
-  stop("Filename must contain one of: 1cov_neutral / 1cov_informative / 1cov_mislead_random. Found: ", fname)
+scenario <- sub("^binarySBM_1cov_([A-Z]+)$", "\\1", fname)
+
+if (scenario == fname || !scenario %in% c("N", "I", "M")) {
+  stop("Filename must look like binarySBM_1cov_<CODE>.rds with CODE in N / I / M. Found: ",
+       basename(data_path))
 }
 
 cat("Scenario:", scenario, "\n\n")
@@ -99,7 +106,8 @@ mcmcpost <- esbm(
   x = x_df,
   similarity_fun = similarity_fun,
   sim_args = sim_args,
-  alpha_g = alpha_vec
+  alpha_g = alpha_vec,
+  similarity_calibration = similarity_calibration
 )
 
 
@@ -116,8 +124,8 @@ base_name  <- file_path_sans_ext(basename(data_path))
 
 out_file <- file.path(
   out_dir,
-  sprintf("postOneCov_%s_alpha-%s_seed-%d.rds",
-          base_name, alpha_tag, seed)
+  sprintf("postOneCov_%s_cal-%s_alpha-%s_seed-%d.rds",
+          base_name, similarity_calibration, alpha_tag, seed)
 )
 
 saveRDS(
@@ -127,7 +135,9 @@ saveRDS(
     alpha    = alpha_in,
     seed     = seed,
     scenario = scenario,
-    N_iter   = N_iter
+    nCov     = 1L,
+    N_iter   = N_iter,
+    similarity_calibration = similarity_calibration
   ),
   file = out_file
 )

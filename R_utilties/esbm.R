@@ -101,8 +101,8 @@ esbm <- function(Y, seed, N_iter, prior,
                  z_init = seq_len(nrow(Y)), 
                  a = 1, b = 1,
                  x = NULL, similarity_fun = NULL, sim_args = list(),
-                 alpha_g = 1, 
-                 similarity_calibration = c("normalized", "raw")) {  
+                 alpha_g = 1,
+                 similarity_calibration = c("raw", "normalized")) {
  
   # ----------------------------------------------
   # Selection of the prior distribution to be used
@@ -367,9 +367,9 @@ esbm <- function(Y, seed, N_iter, prior,
 
           } else if (similarity_calibration == "raw") {
 
-            # geometric averaging across covariates
+            # log g() left unstandardized: weighted sum across covariates
             log_similarity_g <-
-              log_similarity_g + alpha_g[j] * log_g_j 
+              log_similarity_g + alpha_g[j] * log_g_j
           }
         }
       }

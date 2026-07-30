@@ -12,21 +12,36 @@ library(tools)      # file_path_sans_ext
 library(salso)      # point estimate for the clustering
 library(cluster)    # to compute silhouette
 
+args <- R.utils::commandArgs(asValue = TRUE)
+
 ##---------------------------##
 ## Settings
 ##---------------------------##
-results_dir <- here("simulation", "fixed_alpha", "results", "twoCov")
 
-sim_path_NN <- here("simulation", "data", "binarySBM_2cov_NN.rds")
-sim_path_IN <- here("simulation", "data", "binarySBM_2cov_IN.rds")
-sim_path_NI <- here("simulation", "data", "binarySBM_2cov_NI.rds")
-sim_path_II <- here("simulation", "data", "binarySBM_2cov_II.rds")
+## Only results run with this calibration are processed. Runs produced before
+## the calibration tag existed used the sampler default ("normalized") and are
+## therefore ignored here.
+similarity_calibration <- if (is.null(args$similarity_calibration)) {
+  "raw"
+} else {
+  as.character(args$similarity_calibration)
+}
+
+results_dir <- here("simulation", "fixed_alpha", "results", "twoCov")
+data_dir    <- here("simulation", "data")
+
+## Two-covariate scenarios (one letter per covariate)
+##   N = neutral, I = informative, M = misleading
+scenarios <- c("NN", "IN", "II", "MN", "MI", "MM")
 
 burn_frac <- 0.2
 thin_step <- 1
 
+cat("Results dir :", results_dir, "\n")
+cat("Calibration :", similarity_calibration, "\n\n")
+
 ##---------------------------------------------------------##
-## List files and split by scenario keyword
+## List files and split by scenario code
 ##---------------------------------------------------------##
 files_all <- list.files(
   results_dir,
@@ -34,15 +49,21 @@ files_all <- list.files(
   full.names = TRUE
 )
 
-files_NN <- files_all[grepl("2cov_NN", basename(files_all), ignore.case = TRUE)]
-files_IN <- files_all[grepl("2cov_IN", basename(files_all), ignore.case = TRUE)]
-files_NI <- files_all[grepl("2cov_NI", basename(files_all), ignore.case = TRUE)]
-files_II <- files_all[grepl("2cov_II", basename(files_all), ignore.case = TRUE)]
+files_for_scenario <- function(code) {
+  pat <- sprintf(
+    "^postTwoCov_binarySBM_2cov_%s_cal-%s_a1-",
+    code, similarity_calibration
+  )
+  files_all[grepl(pat, basename(files_all))]
+}
 
-cat("Found", length(files_NN), "files for scenario NN\n")
-cat("Found", length(files_IN), "files for scenario IN\n")
-cat("Found", length(files_NI), "files for scenario NI\n")
-cat("Found", length(files_II), "files for scenario II\n\n")
+scenario_files <- lapply(scenarios, files_for_scenario)
+names(scenario_files) <- scenarios
+
+for (code in scenarios) {
+  cat("Found", length(scenario_files[[code]]), "files for scenario", code, "\n")
+}
+cat("\n")
 
 res_for_scenario <- function(sim_path, scenario_files) {
 
@@ -59,9 +80,9 @@ res_for_scenario <- function(sim_path, scenario_files) {
       block_probs    = sim_obj$block_probs,
       clust_sizes    = sim_obj$clust_sizes,
       nCov           = sim_obj$nCov,
-      cov1Dep        = sim_obj$cov1Dep,
-      cov2Dep        = sim_obj$cov2Dep
+      covDep         = sim_obj$covDep
     ),
+    similarity_calibration = similarity_calibration,
     results = list()   # ONLY results grouped by (alpha1, alpha2)
   )
 
@@ -104,7 +125,7 @@ res_for_scenario <- function(sim_path, scenario_files) {
     ARI_mean <- mean(ARI_iter)
     ARI_sd   <- sd(ARI_iter)
 
-    ## silhouette (distance = 1 − PSM)
+    ## silhouette (distance = 1 - PSM)
     diss_mat <- 1 - psm_mat
     sil_obj  <- silhouette(z_hat, dist(diss_mat))
     sil_mean <- mean(sil_obj[, 3])
@@ -122,7 +143,8 @@ res_for_scenario <- function(sim_path, scenario_files) {
       silhouette  = list(object = sil_obj, mean = sil_mean),
       psm         = psm_mat,
       seed        = seed,
-      N_iter      = N_iter
+      N_iter      = N_iter,
+      similarity_calibration = res$similarity_calibration
     )
   }
 
@@ -135,12 +157,20 @@ res_for_scenario <- function(sim_path, scenario_files) {
 out_dir <- here("simulation", "fixed_alpha", "results", "processed", "twoCov")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-combined_NN <- res_for_scenario(sim_path_NN, files_NN)
-combined_IN <- res_for_scenario(sim_path_IN, files_IN)
-combined_NI <- res_for_scenario(sim_path_NI, files_NI)
-combined_II <- res_for_scenario(sim_path_II, files_II)
+for (code in scenarios) {
 
-saveRDS(combined_NN, file.path(out_dir, "scenario_2cov_NN_results.rds"))
-saveRDS(combined_IN, file.path(out_dir, "scenario_2cov_IN_results.rds"))
-saveRDS(combined_NI, file.path(out_dir, "scenario_2cov_NI_results.rds"))
-saveRDS(combined_II, file.path(out_dir, "scenario_2cov_II_results.rds"))
+  if (length(scenario_files[[code]]) == 0) {
+    warning("No results found for scenario ", code,
+            " with calibration ", similarity_calibration, ". Skipping.")
+    next
+  }
+
+  sim_path <- file.path(data_dir, sprintf("binarySBM_2cov_%s.rds", code))
+
+  combined <- res_for_scenario(sim_path, scenario_files[[code]])
+
+  out_file <- file.path(out_dir, sprintf("binarySBM_2cov_%s_results.rds", code))
+  saveRDS(combined, out_file)
+
+  cat("Saved:", out_file, "\n\n")
+}
