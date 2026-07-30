@@ -362,14 +362,12 @@ esbm <- function(Y, seed, N_iter, prior,
 
             log_g_j <- log_g_j - lse_j
 
-            log_similarity_g <-
-              log_similarity_g + alpha_g[j] * log_g_j
+            log_similarity_g <- log_similarity_g + alpha_g[j] * log_g_j
 
           } else if (similarity_calibration == "raw") {
 
             # log g() left unstandardized: weighted sum across covariates
-            log_similarity_g <-
-              log_similarity_g + alpha_g[j] * log_g_j
+            log_similarity_g <- log_similarity_g + alpha_g[j] * log_g_j
           }
         }
       }

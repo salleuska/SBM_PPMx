@@ -27,6 +27,10 @@ similarity_calibration <- if (is.null(args$similarity_calibration)) {
   as.character(args$similarity_calibration)
 }
 
+## Which seed to process. Results are tagged by alpha only, so mixing seeds in
+## one processed file would silently overwrite: one seed at a time.
+seed_use <- if (is.null(args$seed)) 1L else as.integer(args$seed)
+
 ## Paths to results directory and simulation files
 results_dir <- here("simulation", "fixed_alpha", "results", "oneCov")
 data_dir    <- here("simulation", "data")
@@ -39,7 +43,8 @@ burn_frac <- 0.4 # burnin
 thin_step <- 1   # eventual thinning
 
 cat("Results dir :", results_dir, "\n")
-cat("Calibration :", similarity_calibration, "\n\n")
+cat("Calibration :", similarity_calibration, "\n")
+cat("Seed        :", seed_use, "\n\n")
 
 ##---------------------------------------------------------##
 ## List files and split by scenario code
@@ -52,8 +57,8 @@ files_all <- list.files(
 
 files_for_scenario <- function(code) {
   pat <- sprintf(
-    "^postOneCov_binarySBM_1cov_%s_cal-%s_alpha-",
-    code, similarity_calibration
+    "^postOneCov_binarySBM_1cov_%s_cal-%s_alpha-.*_seed-%d\\.rds$",
+    code, similarity_calibration, seed_use
   )
   files_all[grepl(pat, basename(files_all))]
 }

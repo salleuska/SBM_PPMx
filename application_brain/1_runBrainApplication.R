@@ -155,7 +155,10 @@ Z_post <- esbm(
   x              = x_df,
   similarity_fun = similarity_fun,
   sim_args       = sim_args,
-  alpha_g        = alpha_g
+  alpha_g        = alpha_g,
+  ## stated explicitly: this application keeps the standardized similarity it
+  ## has always used. The esbm() default is now "raw" (see R_utilties/esbm.R).
+  similarity_calibration = "normalized"
 )
 
 cat("Done.\n\n")
