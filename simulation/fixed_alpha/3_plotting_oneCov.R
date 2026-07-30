@@ -49,8 +49,11 @@ df <- rbind(
   extract_df(res_mis_rand,  "misleading")
 )
 
-## (optional) drop alpha = 4 if present
-df <- df[df$alpha != 4, ]
+## (optional) drop alpha = 4:  Rscript 3_plotting_oneCov.R drop_alpha4=TRUE
+args <- R.utils::commandArgs(asValue = TRUE)
+drop_alpha4 <- if (is.null(args$drop_alpha4)) FALSE else as.logical(args$drop_alpha4)
+
+if (drop_alpha4) df <- df[df$alpha != 4, ]
 
 df$scenario <- factor(
   df$scenario,
@@ -198,8 +201,11 @@ simple_relabel <- function(z_hat, z_true) {
 }
 
 ## Pick which scenario object to showcase in PSM plots
-## Example: neutral at alpha=0, informative at alpha=0.5/1/2
+## Example: no covariate effect at alpha=0, informative at alpha=0.5/1/2
 
+## At alpha = 0 the similarity is switched off entirely, so this PSM is the
+## network-only baseline: it is identical for the neutral, informative and
+## misleading covariates. Label it as such rather than as "neutral".
 alpha0  <- res_neutral$results$alpha_0.00
 p0 <- plot_psm_with_annotations(
   psm    = alpha0$psm,
@@ -207,7 +213,7 @@ p0 <- plot_psm_with_annotations(
   z_est  = alpha0$z_hat
 )
 p0 <- cowplot::ggdraw() +
-  cowplot::draw_label("Neutral covariate (alpha = 0)",
+  cowplot::draw_label("No covariate effect (alpha = 0)",
                       fontface = "bold", x = 0.5, y = 0.98, hjust = 0.5) +
   cowplot::draw_plot(p0[[4]], x = 0, y = 0, width = 1, height = 0.92)
 
