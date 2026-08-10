@@ -57,46 +57,54 @@ urn_GN <- function(v_minus,gamma_GN){
 #' @param alpha_g Scalar, vector, or list specifying the covariate weights.
 #'   If numeric, \code{alpha_g} is treated as fixed. It may be a scalar, reused
 #'   for all similarity functions, or a vector with one entry per similarity
-#'   function. If a list, \code{alpha_g} is learned within the Gibbs sampler and
-#'   should contain \code{init}, \code{a_alpha}, and \code{b_alpha}. For example,
-#'   \code{list(init = 1, a_alpha = 1, b_alpha = 1)} or
-#'   \code{list(init = c(1,2), a_alpha = c(1,1), b_alpha = c(1,1))}.
+#'   function. If a list, \code{alpha_g} is learned within the Gibbs sampler via
+#'   a conjugate Gamma update and should contain \code{init} (positive starting
+#'   value), \code{a_alpha} (Gamma shape), and \code{b_alpha} (Gamma rate). For
+#'   example, \code{list(init = 1, a_alpha = 2, b_alpha = 1)} or
+#'   \code{list(init = c(1,2), a_alpha = c(2,2), b_alpha = c(1,1))}.
+#' @param similarity_calibration Character, either \code{"raw"} (default) or
+#'   \code{"normalized"}. Controls whether the log similarity \eqn{\log g()} is
+#'   used as-is (\code{"raw"}) or normalised by its log-sum-exp across clusters
+#'   (\code{"normalized"}) before being weighted by \code{alpha_g}. The
+#'   \code{"raw"} form corresponds to the PPMx model as defined in the paper;
+#'   \code{"normalized"} follows an alternative formulation from the literature
+#'   and is provided for comparison.
 #'
 #' @return A list containing:
 #' \describe{
-#'   \item{\code{z_post}}{A \eqn{V \times N_iter} matrix of posterior samples of
-#'   the cluster labels. Entry \code{z_post[v, t]} is the cluster label of node
-#'   \eqn{v} at iteration \eqn{t}.}
-#'   \item{\code{alpha_g_post}}{A \eqn{J \times N_iter} matrix of sampled
-#'   covariate weights, returned when \code{alpha_g} is specified as a list.}
+#'   \item{\code{z_post}}{A \eqn{V \times N_{\mathrm{iter}}} integer matrix of
+#'   posterior samples of cluster labels. Entry \code{z_post[v, t]} gives the
+#'   cluster label of node \eqn{v} at iteration \eqn{t}.}
+#'   \item{\code{alpha_g_post}}{A \eqn{J \times N_{\mathrm{iter}}} matrix of
+#'   posterior samples of the covariate weights. Returned only when \code{alpha_g}
+#'   is specified as a list; \code{NULL} otherwise.}
+#'   \item{\code{alpha_rate_post}}{A \eqn{J \times N_{\mathrm{iter}}} matrix of
+#'   the Gamma rate parameter used at each update of \code{alpha_g}. Useful for
+#'   diagnosing the sampler. Returned only when \code{alpha_g} is a list;
+#'   \code{NULL} otherwise.}
 #' }
 #'
 #' @details
-#' The argument \code{similarity_fun} is used only for local reassignment
-#' probabilities inside the Gibbs update. If \code{learn_alpha_g = TRUE}, an
-#' additional partition-level similarity evaluation is needed to update
-#' \code{alpha_g}.
+#' The Gibbs update for \eqn{\alpha_g^{(j)}} exploits the conjugacy of the
+#' Gamma prior with the likelihood contribution of the partition-level similarity
+#' \eqn{\log g()}: the posterior is
+#' \eqn{\alpha_g^{(j)} \mid \text{rest} \sim
+#'   \mathrm{Gamma}(a_\alpha^{(j)},\; b_\alpha^{(j)} - \sum_h \log g(X_h^*))}.
+#' The rate \eqn{b_\alpha - \sum_h \log g_h} must be positive for the Gamma to
+#' be well-defined. If it is not (which can occur when log similarities are
+#' large and positive), the current value of \code{alpha_g} is kept and a
+#' warning is issued.
 #'
 #' @examples
 #' prior <- list(name = "GN", gamma_GN = 0.3)
-#' fit <- esbm(Y = Y, seed = 1, N_iter = 1000, prior = prior)
+#' fit   <- esbm(Y = Y, seed = 1, N_iter = 1000, prior = prior)
+#'
+#' # with learned alpha
+#' fit2  <- esbm(Y = Y, seed = 1, N_iter = 1000, prior = prior,
+#'               x = x_df, similarity_fun = sim_fun, sim_args = sim_args,
+#'               alpha_g = list(init = 1, a_alpha = 2, b_alpha = 1))
 
  
-  ## possibile controllo
-  ## if x is a dataframe
-  ## ncol(Y) = nrow(Y) = nrow(x)
-  ## ncol(x) = length(similarity_fun)
-  ## similarity_fun is list 
-  ## da aggiungere ora un vettore alpha - length(alpha) = length(similarity_fun)
-
-
-# esbm <- function(Y, seed, N_iter, prior, z_init=c(1:nrow(Y)), a=1, b=1,
-#                  alpha_PY=NA, sigma_PY=NA, beta_DM=NA, H_DM=NA, gamma_GN=NA, 
-#                  x=NULL,
-#                  similarity_fun = NULL, 
-#                  sim_args = list(),  
-#                alpha_g = 1){
-
 esbm <- function(Y, seed, N_iter, prior, 
                  z_init = seq_len(nrow(Y)), 
                  a = 1, b = 1,
@@ -435,11 +443,14 @@ esbm <- function(Y, seed, N_iter, prior,
 
         alpha_rate_post[j, t] <- rate_alpha
 
-        alpha_g[j] <- rgamma(
-          1,
-          shape = a_alpha[j],
-          rate = rate_alpha
-        )
+        if (rate_alpha <= 0) {
+          warning(sprintf(
+            "Iteration %d, covariate %d: Gamma rate = %.4f <= 0; keeping current alpha_g.",
+            t, j, rate_alpha
+          ))
+        } else {
+          alpha_g[j] <- rgamma(1, shape = a_alpha[j], rate = rate_alpha)
+        }
       }
 
       alpha_g_post[, t] <- alpha_g
