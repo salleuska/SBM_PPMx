@@ -23,7 +23,7 @@ seed     <- if (is.null(args$seed)) 123 else as.integer(args$seed)
 N_iter   <- if (is.null(args$N_iter)) 10000 else as.integer(args$N_iter)
 
 similarity_calibration <- if (is.null(args$similarity_calibration)) {
-  "normalized"
+  "raw"
 } else {
   as.character(args$similarity_calibration)
 }
