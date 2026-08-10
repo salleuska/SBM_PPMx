@@ -140,8 +140,8 @@ for (f in files_all) {
       covariate = c("x", "y", "z")[seq_len(nrow(alpha_kept))],
       mean      = rowMeans(alpha_kept),
       sd        = apply(alpha_kept, 1, sd),
-      q025      = apply(alpha_kept, 1, quantile, 0.025),
-      q975      = apply(alpha_kept, 1, quantile, 0.975)
+      q025      = apply(alpha_kept, 1, function(x) bayestestR::hdi(x, ci = 0.95)$CI_low),
+      q975      = apply(alpha_kept, 1, function(x) bayestestR::hdi(x, ci = 0.95)$CI_high)
     )
     cat(sprintf("  K_hat = %d | alpha means: %s\n",
                 K_hat,

@@ -84,6 +84,10 @@ extract_df <- function(f) {
       function(z_t) mclust::adjustedRandIndex(z_t, obj$sim$partition_true)
     )
 
+    covDep <- obj$sim$covDep
+    cov_type <- ifelse(covDep == "informative",    "informative",
+                ifelse(covDep == "mislead_random", "misleading", "neutral"))
+
     out_alpha <- lapply(seq_len(nrow(alpha_mat)), function(j) {
 
       alpha_vec <- as.numeric(alpha_mat[j, ])
@@ -93,6 +97,7 @@ extract_df <- function(f) {
         nCov = nCov,
         scenario_label = scenario,
         covariate = paste0("x", j),
+        cov_type = cov_type[j],
         tag = nm,
         seed = r$seed,
         a_alpha = r$alpha_g$a_alpha,
@@ -101,8 +106,8 @@ extract_df <- function(f) {
         model = "ESBM",
 
         alpha_mean = mean(alpha_vec, na.rm = TRUE),
-        alpha_lwr = quantile(alpha_vec, 0.025, na.rm = TRUE),
-        alpha_upr = quantile(alpha_vec, 0.975, na.rm = TRUE),
+        alpha_lwr = bayestestR::hdi(alpha_vec, ci = 0.95)$CI_low,
+        alpha_upr = bayestestR::hdi(alpha_vec, ci = 0.95)$CI_high,
 
         ARI_vi = r$ARI_vi,
         ARI_mean = mean(ARI_vec, na.rm = TRUE),
@@ -213,38 +218,72 @@ nCov_tag <- if (is.null(nCov_plot)) "all" else paste0(nCov_plot, "Cov")
 ## Posterior alpha plot
 ## ------------------------------------------------------------
 
-p_alpha <- ggplot(df, aes(x = scenario_label, y = alpha_mean, color = covariate)) +
-  geom_point(position = position_dodge(width = 0.6), size = 2.5) +
-  geom_errorbar(
-    aes(ymin = alpha_lwr, ymax = alpha_upr),
-    position = position_dodge(width = 0.6),
-    width = 0.2,
-    alpha = 0.7
-  ) +
-  theme_minimal(base_size = 14) +
-  ylim(c(0,5)) + 
-  labs(
-    title = "Posterior distribution of learned alpha",
-    subtitle = scenario_caption,
-    x = "Scenario",
-    y = expression(alpha[g]),
-    color = "Covariate"
-  ) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    legend.title = element_text(face = "bold"),
-    axis.text.x = element_text(angle = 0, hjust = 0.5)
-  )
+type_colors <- c(informative = "#2166AC", misleading = "#D6604D", neutral = "#878787")
 
-if (is.null(nCov_plot)) {
-  p_alpha <- p_alpha + facet_wrap(~ nCov, scales = "free_x", labeller = label_both)
+many_cov <- !is.null(nCov_plot) && nCov_plot >= 10
+
+if (many_cov) {
+
+  # one plot per scenario: covariates on x-axis sequentially, colored by type
+  df_many <- df[df$nCov == nCov_plot, ]
+  df_many$cov_type <- factor(df_many$cov_type, levels = c("informative", "misleading", "neutral"))
+
+  # covariate index for sequential x ordering
+  df_many$cov_idx <- as.integer(sub("^x", "", df_many$covariate))
+
+  p_alpha <- ggplot(df_many, aes(x = cov_idx, y = alpha_mean, color = cov_type)) +
+    geom_point(size = 1.8) +
+    geom_errorbar(aes(ymin = alpha_lwr, ymax = alpha_upr), width = 0, alpha = 0.6) +
+    scale_color_manual(values = type_colors) +
+    facet_wrap(~ scenario_label, ncol = 1) +
+    theme_minimal(base_size = 13) +
+    labs(
+      title = "Posterior of learned alpha (50 covariates)",
+      x = "Covariate index",
+      y = expression(alpha[g]),
+      color = "Covariate type"
+    ) +
+    theme(
+      plot.title    = element_text(face = "bold"),
+      legend.title  = element_text(face = "bold"),
+      strip.text    = element_text(face = "bold")
+    )
+
+} else {
+
+  p_alpha <- ggplot(df, aes(x = scenario_label, y = alpha_mean, color = covariate)) +
+    geom_point(position = position_dodge(width = 0.6), size = 2.5) +
+    geom_errorbar(
+      aes(ymin = alpha_lwr, ymax = alpha_upr),
+      position = position_dodge(width = 0.6),
+      width = 0.2, alpha = 0.7
+    ) +
+    theme_minimal(base_size = 14) +
+    ylim(c(0, 5)) +
+    labs(
+      title = "Posterior distribution of learned alpha",
+      subtitle = scenario_caption,
+      x = "Scenario",
+      y = expression(alpha[g]),
+      color = "Covariate"
+    ) +
+    theme(
+      plot.title   = element_text(face = "bold"),
+      legend.title = element_text(face = "bold"),
+      axis.text.x  = element_text(angle = 0, hjust = 0.5)
+    )
+
+  if (is.null(nCov_plot)) {
+    p_alpha <- p_alpha + facet_wrap(~ nCov, scales = "free_x", labeller = label_both)
+  }
+
 }
 
 ggsave(
   file.path(outDir, paste0("posterior_alpha_", nCov_tag, ".pdf")),
   p_alpha,
-  width = 8,
-  height = 4.5
+  width = if (many_cov) 10 else 8,
+  height = if (many_cov) 3 * length(unique(df_many$scenario_label)) else 4.5
 )
 
 ## ------------------------------------------------------------
