@@ -84,15 +84,18 @@ extract_df <- function(f) {
     r         <- obj$results[[nm]]
     alpha_mat <- if (is.null(dim(r$alpha_post))) matrix(r$alpha_post, nrow = 1) else r$alpha_post
     cov_type  <- map_cov_type(obj$sim$covDep)
+    n_nodes   <- nrow(obj$sim$Y)
 
     ARI_vec <- apply(r$Z_post, 2,
       function(z_t) mclust::adjustedRandIndex(z_t, obj$sim$partition_true))
 
     do.call(rbind, lapply(seq_len(nrow(alpha_mat)), function(j) {
       av <- as.numeric(alpha_mat[j, ])
+      a_hdi <- bayestestR::hdi(av, ci = 0.95)
       data.frame(
         sim_name       = meta$sim_name,
         nCov           = meta$nCov,
+        n_nodes        = n_nodes,
         scenario_label = meta$scenario,
         covariate      = paste0("x", j),
         cov_type       = cov_type[j],
@@ -103,8 +106,11 @@ extract_df <- function(f) {
         prior          = paste0("Gamma(", r$alpha_g$a_alpha, ",", r$alpha_g$b_alpha, ")"),
         model          = "ESBM",
         alpha_mean     = mean(av, na.rm = TRUE),
-        alpha_lwr      = bayestestR::hdi(av, ci = 0.95)$CI_low,
-        alpha_upr      = bayestestR::hdi(av, ci = 0.95)$CI_high,
+        alpha_lwr      = a_hdi$CI_low,
+        alpha_upr      = a_hdi$CI_high,
+        beta_mean      = n_nodes * mean(av, na.rm = TRUE),
+        beta_lwr       = n_nodes * a_hdi$CI_low,
+        beta_upr       = n_nodes * a_hdi$CI_high,
         ARI_vi         = r$ARI_vi,
         ARI_mean       = mean(ARI_vec, na.rm = TRUE),
         ARI_lwr        = quantile(ARI_vec, 0.025, na.rm = TRUE),
@@ -130,6 +136,7 @@ extract_df_sbm <- function(f) {
     data.frame(
       sim_name       = meta$sim_name,
       nCov           = meta$nCov,
+      n_nodes        = nrow(obj$sim$Y),
       scenario_label = meta$scenario,
       covariate      = NA_character_,
       cov_type       = NA_character_,
@@ -142,6 +149,9 @@ extract_df_sbm <- function(f) {
       alpha_mean     = NA_real_,
       alpha_lwr      = NA_real_,
       alpha_upr      = NA_real_,
+      beta_mean      = NA_real_,
+      beta_lwr       = NA_real_,
+      beta_upr       = NA_real_,
       ARI_vi         = r$ARI_vi,
       ARI_mean       = mean(ARI_vec, na.rm = TRUE),
       ARI_lwr        = quantile(ARI_vec, 0.025, na.rm = TRUE),
@@ -206,43 +216,67 @@ if (many_cov) {
   title_str <- "Posterior distribution of learned alpha"
 }
 
-p_alpha <- ggplot(df_alpha, aes(x = x_val, y = alpha_mean, color = cov_type)) +
-  geom_point(size = if (many_cov) 1.8 else 2.5) +
-  geom_errorbar(aes(ymin = alpha_lwr, ymax = alpha_upr),
-                width = 0, alpha = if (many_cov) 0.6 else 0.7) +
-  scale_color_manual(values = TYPE_COLORS) +
-  scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
-  labs(
-    title    = title_str,
-    subtitle = if (!many_cov) scenario_caption else NULL,
-    x = x_lab,
-    y = expression(alpha[g]),
-    color = "Covariate type"
-  ) +
-  theme_minimal(base_size = if (many_cov) 13 else 14) +
-  theme(plot.title = element_text(face = "bold"),
-        legend.title = element_text(face = "bold"))
+dodge_w <- if (many_cov) 0.6 else 0.5
 
-if (many_cov) {
-  p_alpha <- p_alpha +
-    scale_x_continuous(breaks = scales::breaks_pretty()) +
-    facet_wrap(~ scenario_label, ncol = 1) +
-    theme(strip.text = element_text(face = "bold"))
-} else if (is.null(nCov_plot)) {
-  p_alpha <- p_alpha +
-    scale_x_continuous(breaks = seq_along(scen_levels), labels = scen_levels) +
-    facet_wrap(~ nCov, scales = "free_x", labeller = label_both) +
-    theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
-} else {
-  p_alpha <- p_alpha +
-    scale_x_continuous(breaks = seq_along(scen_levels), labels = scen_levels) +
-    theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+build_alpha_style_plot <- function(y_mean, y_lwr, y_upr, y_lab, title_pref) {
+  ggplot(df_alpha, aes(x = x_val, y = .data[[y_mean]],
+                        color = cov_type, shape = prior)) +
+    geom_point(size = if (many_cov) 1.8 else 2.5,
+               position = position_dodge(width = dodge_w)) +
+    geom_errorbar(aes(ymin = .data[[y_lwr]], ymax = .data[[y_upr]]),
+                  width = 0, alpha = if (many_cov) 0.6 else 0.7,
+                  position = position_dodge(width = dodge_w)) +
+    scale_color_manual(values = TYPE_COLORS) +
+    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
+    labs(
+      title    = paste0(title_pref, " (", title_str, ")"),
+      subtitle = if (!many_cov) scenario_caption else NULL,
+      x = x_lab,
+      y = y_lab,
+      color = "Covariate type",
+      shape = "Prior"
+    ) +
+    theme_minimal(base_size = if (many_cov) 13 else 14) +
+    theme(plot.title = element_text(face = "bold"),
+          legend.title = element_text(face = "bold"))
 }
+
+p_alpha <- build_alpha_style_plot("alpha_mean", "alpha_lwr", "alpha_upr",
+                                   expression(alpha[g]), "Posterior alpha")
+p_beta  <- build_alpha_style_plot("beta_mean", "beta_lwr", "beta_upr",
+                                   expression(beta[g] == n * alpha[g]), "Posterior beta = n*alpha")
+
+add_facets <- function(p) {
+  if (many_cov) {
+    p +
+      scale_x_continuous(breaks = scales::breaks_pretty()) +
+      facet_wrap(~ scenario_label, ncol = 1) +
+      theme(strip.text = element_text(face = "bold"))
+  } else if (is.null(nCov_plot)) {
+    p +
+      scale_x_continuous(breaks = seq_along(scen_levels), labels = scen_levels) +
+      facet_wrap(~ nCov, scales = "free_x", labeller = label_both) +
+      theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+  } else {
+    p +
+      scale_x_continuous(breaks = seq_along(scen_levels), labels = scen_levels) +
+      theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+  }
+}
+
+p_alpha <- add_facets(p_alpha)
+p_beta  <- add_facets(p_beta)
 
 n_scen <- length(unique(df_alpha$scenario_label))
 ggsave(
   file.path(outDir, paste0("posterior_alpha_", nCov_tag, ".pdf")),
   p_alpha,
+  width  = if (many_cov) 10 else 8,
+  height = if (many_cov) 3 * n_scen else 4.5
+)
+ggsave(
+  file.path(outDir, paste0("posterior_beta_", nCov_tag, ".pdf")),
+  p_beta,
   width  = if (many_cov) 10 else 8,
   height = if (many_cov) 3 * n_scen else 4.5
 )
@@ -378,6 +412,139 @@ for (f in processed_files) {
 
   for (nm in names(obj$results)) {
     plot_trace_pair(obj, meta$sim_name, nm, trace_dir)
+  }
+}
+
+## ------------------------------------------------------------
+## Ratio matrix plots
+## ------------------------------------------------------------
+
+make_ratio_df <- function(alpha_mat, cov_labels, cov_types, log_scale = FALSE) {
+
+  J    <- nrow(alpha_mat)
+  grid <- expand.grid(g = seq_len(J), g_prime = seq_len(J),
+                      KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
+
+  res <- do.call(rbind, lapply(seq_len(nrow(grid)), function(i) {
+    j  <- grid$g[i]
+    jp <- grid$g_prime[i]
+
+    if (j == jp) {
+      val  <- if (log_scale) 0 else 1
+      lwr  <- val
+      upr  <- val
+    } else {
+      aj  <- as.numeric(alpha_mat[j,  ])
+      ajp <- as.numeric(alpha_mat[jp, ])
+      if (log_scale) {
+        vals <- aj - ajp          # log alpha_g - log alpha_g' (works for negative too)
+      } else {
+        vals <- aj / ajp
+      }
+      h    <- bayestestR::hdi(vals, ci = 0.95)
+      val  <- mean(vals, na.rm = TRUE)
+      lwr  <- h$CI_low
+      upr  <- h$CI_high
+    }
+
+    data.frame(g = j, g_prime = jp, mean_val = val, lwr = lwr, upr = upr)
+  }))
+
+  res$cov_g       <- factor(cov_labels[res$g],       levels = cov_labels)
+  res$cov_g_prime <- factor(cov_labels[res$g_prime],  levels = cov_labels)
+  res$type_g      <- cov_types[res$g]
+  res
+}
+
+plot_ratio_matrix <- function(obj, scenario, result_name, outDir) {
+
+  r         <- obj$results[[result_name]]
+  alpha_mat <- if (is.null(dim(r$alpha_post))) matrix(r$alpha_post, nrow = 1) else r$alpha_post
+
+  J          <- nrow(alpha_mat)
+  cov_labels <- paste0("x", seq_len(J))
+  cov_types  <- map_cov_type(obj$sim$covDep[seq_len(J)])
+
+  # for centered Normal prior alpha can be negative — use difference (log scale) only
+  centered <- !is.null(r$alpha_g$mu_0)
+  has_neg  <- any(alpha_mat < 0, na.rm = TRUE)
+
+  label_size <- if (J <= 10) 3 else if (J <= 20) 2 else NA
+
+  ratio_dir <- file.path(outDir, "ratio_matrix")
+  dir.create(ratio_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # axis tick colors by covariate type
+  axis_colors <- TYPE_COLORS[cov_types]
+
+  make_tile_plot <- function(df, log_scale) {
+
+    mid_val  <- if (log_scale) 0 else 1
+    scale_lbl <- if (log_scale) expression(log(alpha[g]/alpha[g*minute]))  else expression(alpha[g]/alpha[g*minute])
+    file_tag  <- if (log_scale) "logRatio" else "ratio"
+
+    p <- ggplot(df, aes(x = cov_g_prime, y = cov_g, fill = mean_val)) +
+      geom_tile(color = "white", linewidth = 0.4) +
+      scale_fill_gradient2(
+        low      = "#D6604D",
+        mid      = "white",
+        high     = "#2166AC",
+        midpoint = mid_val,
+        name     = scale_lbl
+      ) +
+      scale_x_discrete(position = "bottom") +
+      scale_y_discrete(limits = rev(cov_labels)) +
+      theme_minimal(base_size = 11) +
+      theme(
+        axis.text.x  = element_text(angle = 45, hjust = 1,
+                                     color = axis_colors[match(levels(df$cov_g_prime), cov_labels)]),
+        axis.text.y  = element_text(color = rev(axis_colors)),
+        panel.grid   = element_blank(),
+        legend.title = element_text(size = 9),
+        plot.title   = element_text(face = "bold")
+      ) +
+      labs(
+        title = paste0(scenario, ": ", if (log_scale) "log-ratio" else "ratio", " matrix"),
+        subtitle = paste0(result_name, " | ", scenario_caption),
+        x = expression(alpha[g*minute]),
+        y = expression(alpha[g])
+      )
+
+    # annotate with mean if matrix is small enough
+    if (!is.na(label_size)) {
+      df$label <- ifelse(df$g == df$g_prime,
+                         if (log_scale) "0" else "1",
+                         sprintf("%.2f", df$mean_val))
+      p <- p + geom_text(data = df, aes(label = label), size = label_size, color = "grey20")
+    }
+
+    size_px <- max(4, J * 0.5)
+    ggsave(
+      file.path(ratio_dir, paste0(file_tag, "_", scenario, "_", result_name, ".pdf")),
+      p, width = size_px + 1.5, height = size_px, limitsize = FALSE
+    )
+  }
+
+  # version 1: ratio (skip if any negative alpha values)
+  if (!has_neg) {
+    df_ratio <- make_ratio_df(alpha_mat, cov_labels, cov_types, log_scale = FALSE)
+    make_tile_plot(df_ratio, log_scale = FALSE)
+  }
+
+  # version 2: log ratio (difference — always valid, works for negatives too)
+  df_log <- make_ratio_df(alpha_mat, cov_labels, cov_types, log_scale = TRUE)
+  make_tile_plot(df_log, log_scale = TRUE)
+}
+
+for (f in processed_files) {
+
+  meta <- parse_sim_name(f)
+  if (!is.null(nCov_plot) && meta$nCov != nCov_plot) next
+
+  obj <- readRDS(f)
+
+  for (nm in names(obj$results)) {
+    plot_ratio_matrix(obj, meta$sim_name, nm, outDir)
   }
 }
 
