@@ -69,6 +69,10 @@ urn_GN <- function(v_minus,gamma_GN){
 #'   \code{"raw"} form corresponds to the PPMx model as defined in the paper;
 #'   \code{"normalized"} follows an alternative formulation from the literature
 #'   and is provided for comparison.
+#' @param standardize Logical, default \code{TRUE}. If \code{TRUE}, each numeric
+#'   column of \code{x} is centered and scaled to mean 0 and variance 1, with the
+#'   variance computed dividing by \eqn{n} (so that \eqn{\sum_i x_i^2 = n}).
+#'   Factor columns are left unchanged. See \code{standardize_covariates()}.
 #'
 #' @return A list containing:
 #' \describe{
@@ -110,7 +114,8 @@ esbm <- function(Y, seed, N_iter, prior,
                  a = 1, b = 1,
                  x = NULL, similarity_fun = NULL, sim_args = list(),
                  alpha_g = 1,
-                 similarity_calibration = c("raw", "normalized")) {
+                 similarity_calibration = c("raw", "normalized"),
+                 standardize = TRUE) {
  
   # ----------------------------------------------
   # Selection of the prior distribution to be used
@@ -167,6 +172,11 @@ esbm <- function(Y, seed, N_iter, prior,
 
     if (ncol(x) == 0L) {
       stop("x must have at least one column.")
+    }
+
+    if (standardize) {
+      x <- standardize_covariates(x)
+      message("Note: numeric covariates standardized to mean 0 and variance 1 (divided by n).")
     }
 
     if (is.null(similarity_fun)) {
@@ -472,6 +482,33 @@ esbm <- function(Y, seed, N_iter, prior,
     alpha_rate_post = alpha_rate_post
   ))
 
+}
+
+
+#' Standardize numeric covariates
+#'
+#' Centers each numeric column of \code{x} to mean 0 and scales it to variance 1,
+#' with the variance computed dividing by \eqn{n} rather than \eqn{n - 1}, so
+#' that \eqn{\sum_i x_i^2 = n}. Factor columns are returned unchanged. Exported
+#' so that quantities computed outside \code{esbm()} (e.g. similarity values used
+#' to set hyperparameters) can use exactly the covariates seen by the sampler.
+#'
+#' @param x A data.frame of covariates.
+#' @return The data.frame with numeric columns standardized.
+standardize_covariates <- function(x) {
+
+  for (j in seq_len(ncol(x))) {
+    if (is.numeric(x[[j]])) {
+      x_j <- x[[j]] - mean(x[[j]])
+      sd_j <- sqrt(mean(x_j^2))
+      if (sd_j == 0) {
+        stop(sprintf("Covariate %d is constant and cannot be standardized.", j))
+      }
+      x[[j]] <- x_j / sd_j
+    }
+  }
+
+  x
 }
 
 
