@@ -29,4 +29,7 @@
 *.sh
 *.png
 *.txt
-*.DS_Storetmp_old_unstandardized/
+
+.DS_Store
+**/.DS_Store
+tmp_old_unstandardized/
