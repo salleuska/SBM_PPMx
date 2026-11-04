@@ -16,8 +16,22 @@ if (is.null(args$data_path)) {
 }
 
 alpha_init <- if (is.null(args$alpha_init)) 2 else as.numeric(args$alpha_init)
-a_alpha    <- if (is.null(args$a_alpha)) 2 else as.numeric(args$a_alpha)
-b_alpha    <- if (is.null(args$b_alpha)) 1 else as.numeric(args$b_alpha)
+## a_alpha and b_alpha accept one value per covariate, comma separated
+## (e.g. b_alpha=1,75); a single value is reused for all covariates.
+a_alpha    <- if (is.null(args$a_alpha)) 2 else as.numeric(strsplit(args$a_alpha, ",")[[1]])
+b_alpha    <- if (is.null(args$b_alpha)) 1 else as.numeric(strsplit(args$b_alpha, ",")[[1]])
+
+## alpha_prior:
+##   "gamma"      -> Gamma(a_alpha, b_alpha) as given
+##   "recentered" -> a_j = c, b_j = c + log G0_j, with log G0_j the log
+##                   similarity of all nodes in one cluster; a_alpha and
+##                   b_alpha are ignored. c_alpha defaults to n/2.
+alpha_prior <- if (is.null(args$alpha_prior)) "gamma" else as.character(args$alpha_prior)
+c_alpha     <- if (is.null(args$c_alpha)) NULL else as.numeric(args$c_alpha)
+
+if (!alpha_prior %in% c("gamma", "recentered")) {
+  stop("alpha_prior must be either 'gamma' or 'recentered'.")
+}
 
 seed     <- if (is.null(args$seed)) 123 else as.integer(args$seed)
 N_iter   <- if (is.null(args$N_iter)) 10000 else as.integer(args$N_iter)
@@ -34,8 +48,13 @@ cat("Running the following:\n")
 cat("  model = ", model, "\n")
 cat("  file       =", data_path, "\n")
 cat("  alpha init =", alpha_init, "\n")
-cat("  a_alpha    =", a_alpha, "\n")
-cat("  b_alpha    =", b_alpha, "\n")
+cat("  alpha prior =", alpha_prior, "\n")
+if (alpha_prior == "gamma") {
+  cat("  a_alpha    =", a_alpha, "\n")
+  cat("  b_alpha    =", b_alpha, "\n")
+} else {
+  cat("  c_alpha    =", if (is.null(c_alpha)) "n/2" else c_alpha, "\n")
+}
 cat("  calibration =", similarity_calibration, "\n")
 cat("  seed       =", seed, "\n")
 cat("  N_iter     =", N_iter, "\n\n")
@@ -119,10 +138,46 @@ if (model == "SBM") {
     simplify = FALSE
   )
 
+  log_G0 <- NULL
+
+  if (alpha_prior == "recentered") {
+
+    if (similarity_calibration != "raw") {
+      stop("alpha_prior=recentered requires similarity_calibration=raw.")
+    }
+
+    n <- nrow(x_df)
+    if (is.null(c_alpha)) c_alpha <- n / 2
+
+    ## log G0_j on the same standardized covariates the sampler uses
+    x_std <- standardize_covariates(x_df)
+    Z_one <- matrix(1, n, 1)
+
+    log_G0 <- vapply(seq_len(nCov), function(j) {
+      sum(similarity_fun[[j]](
+        mode = "partition",
+        Z    = Z_one,
+        x    = x_std[[j]],
+        args = sim_args[[j]]
+      ))
+    }, numeric(1))
+
+    a_alpha <- rep(c_alpha, nCov)
+    b_alpha <- c_alpha + log_G0
+
+    cat("Recentered prior:\n")
+    cat("  log G0     =", round(log_G0, 3), "\n")
+    cat("  a_alpha    =", round(a_alpha, 3), "\n")
+    cat("  b_alpha    =", round(b_alpha, 3), "\n\n")
+  }
+
   alpha_spec <- list(
     init    = alpha_init,
     a_alpha = a_alpha,
-    b_alpha = b_alpha
+    b_alpha = b_alpha,
+    prior   = alpha_prior,
+    c_alpha = c_alpha,
+    log_G0  = log_G0
   )
 }
 
@@ -197,13 +252,25 @@ if (model == "SBM") {
     seed
   )
 } else {
-  alpha_tag <- sprintf(
-    "cal-%s_init-%s_a-%s_b-%s",
-    similarity_calibration,
-    gsub("\\.", "p", sprintf("%.2f", alpha_init)),
-    gsub("\\.", "p", sprintf("%.2f", a_alpha)),
-    gsub("\\.", "p", sprintf("%.2f", b_alpha))
-  )
+  num_tag <- function(v) paste(gsub("\\.", "p", sprintf("%.2f", v)), collapse = "-")
+
+  if (alpha_prior == "recentered") {
+    ## a and b are per covariate and b can be negative: tag by c instead
+    alpha_tag <- sprintf(
+      "cal-%s_init-%s_recentered_c-%s",
+      similarity_calibration,
+      num_tag(alpha_init),
+      num_tag(c_alpha)
+    )
+  } else {
+    alpha_tag <- sprintf(
+      "cal-%s_init-%s_a-%s_b-%s",
+      similarity_calibration,
+      num_tag(alpha_init),
+      num_tag(a_alpha),
+      num_tag(b_alpha)
+    )
+  }
 
   out_name <- sprintf(
     "post_%s_alphaLearn-%s_seed-%d.rds",

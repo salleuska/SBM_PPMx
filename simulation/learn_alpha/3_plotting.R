@@ -89,7 +89,12 @@ extract_df <- function(f) {
     ARI_vec <- apply(r$Z_post, 2,
       function(z_t) mclust::adjustedRandIndex(z_t, obj$sim$partition_true))
 
-    do.call(rbind, lapply(seq_len(nrow(alpha_mat)), function(j) {
+    J_r     <- nrow(alpha_mat)
+    a_vec   <- rep_len(r$alpha_g$a_alpha, J_r)
+    b_vec   <- rep_len(r$alpha_g$b_alpha, J_r)
+    prior_r <- prior_label(r$alpha_g)
+
+    do.call(rbind, lapply(seq_len(J_r), function(j) {
       av <- as.numeric(alpha_mat[j, ])
       a_hdi <- bayestestR::hdi(av, ci = 0.95)
       data.frame(
@@ -101,9 +106,9 @@ extract_df <- function(f) {
         cov_type       = cov_type[j],
         tag            = nm,
         seed           = r$seed,
-        a_alpha        = r$alpha_g$a_alpha,
-        b_alpha        = r$alpha_g$b_alpha,
-        prior          = paste0("Gamma(", r$alpha_g$a_alpha, ",", r$alpha_g$b_alpha, ")"),
+        a_alpha        = a_vec[j],
+        b_alpha        = b_vec[j],
+        prior          = prior_r,
         model          = "ESBM",
         alpha_mean     = mean(av, na.rm = TRUE),
         alpha_lwr      = a_hdi$CI_low,
@@ -119,6 +124,15 @@ extract_df <- function(f) {
       )
     }))
   }))
+}
+
+## Label of the alpha prior used in a run
+prior_label <- function(alpha_g) {
+  if (identical(alpha_g$prior, "recentered")) {
+    paste0("Recentered Gamma(c,c), c=", alpha_g$c_alpha)
+  } else {
+    paste0("Gamma(", alpha_g$a_alpha[1], ",", alpha_g$b_alpha[1], ")")
+  }
 }
 
 ## SBM baseline (no covariate)
@@ -331,15 +345,18 @@ make_trace_df <- function(obj, scenario, result_name) {
   r        <- obj$results[[result_name]]
   alpha_mat <- if (is.null(dim(r$alpha_post))) matrix(r$alpha_post, nrow = 1) else r$alpha_post
   rate_mat  <- if (is.null(dim(r$alpha_rate_post))) matrix(r$alpha_rate_post, nrow = 1) else r$alpha_rate_post
-  b_alpha  <- r$alpha_g$b_alpha
   cov_type <- map_cov_type(obj$sim$covDep[seq_len(nrow(alpha_mat))])
 
   J      <- nrow(alpha_mat)
   N_iter <- ncol(alpha_mat)
 
+  ## one b per covariate (recentered prior has a different b_j for each)
+  b_vec  <- rep_len(r$alpha_g$b_alpha, J)
+
   do.call(rbind, lapply(seq_len(J), function(j) {
     av <- as.numeric(alpha_mat[j, ])
     rv <- as.numeric(rate_mat[j, ])
+    b_alpha <- b_vec[j]
     data.frame(
       iter       = seq_len(N_iter),
       alpha      = av,

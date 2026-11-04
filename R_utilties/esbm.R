@@ -59,7 +59,8 @@ urn_GN <- function(v_minus,gamma_GN){
 #'   for all similarity functions, or a vector with one entry per similarity
 #'   function. If a list, \code{alpha_g} is learned within the Gibbs sampler via
 #'   a conjugate Gamma update and should contain \code{init} (positive starting
-#'   value), \code{a_alpha} (Gamma shape), and \code{b_alpha} (Gamma rate). For
+#'   value), \code{a_alpha} (Gamma shape), and \code{b_alpha} (Gamma rate; may be
+#'   negative, see Details). For
 #'   example, \code{list(init = 1, a_alpha = 2, b_alpha = 1)} or
 #'   \code{list(init = c(1,2), a_alpha = c(2,2), b_alpha = c(1,1))}.
 #' @param similarity_calibration Character, either \code{"raw"} (default) or
@@ -98,6 +99,15 @@ urn_GN <- function(v_minus,gamma_GN){
 #' be well-defined. If it is not (which can occur when log similarities are
 #' large and positive), the current value of \code{alpha_g} is kept and a
 #' warning is issued.
+#'
+#' \code{b_alpha} itself is allowed to be zero or negative. This is used by the
+#' recentered prior: with \eqn{\log G_0^{(j)}} the log similarity of all nodes
+#' in a single cluster, setting \eqn{a_\alpha^{(j)} = c} and
+#' \eqn{b_\alpha^{(j)} = c + \log G_0^{(j)}} gives the rate
+#' \eqn{c - [\log G(\rho) - \log G_0^{(j)}]}, i.e. a Gamma(c, c) prior on
+#' \eqn{\alpha_g^{(j)}} with the similarity recentered at the one-cluster
+#' partition. For standardized Gaussian covariates (\code{standardize = TRUE})
+#' and \eqn{c = n/2} the rate is positive for every partition.
 #'
 #' @examples
 #' prior <- list(name = "GN", gamma_GN = 0.3)
@@ -239,7 +249,10 @@ esbm <- function(Y, seed, N_iter, prior,
 
       if (any(alpha_g_init <= 0)) stop("alpha_g$init must be positive.")
       if (any(a_alpha <= 0)) stop("alpha_g$a_alpha must be positive.")
-      if (any(b_alpha <= 0)) stop("alpha_g$b_alpha must be positive.")
+      ## b_alpha may be zero or negative: with the recentered prior
+      ## b_alpha = c + log G0 (see @details), only the rate b_alpha - log G()
+      ## needs to be positive, and that is checked at each update.
+      if (any(!is.finite(b_alpha))) stop("alpha_g$b_alpha must be finite.")
 
       alpha_g <- alpha_g_init
 
