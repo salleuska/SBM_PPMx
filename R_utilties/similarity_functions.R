@@ -83,14 +83,12 @@ similarity_ppmx_gaussian_mean <- function(mode, x, args,
       n_h <- length(x_h)
       s1_h <- sum(x_h)
 
-      log_g_h[h] <-
-      ## constant 
-      ## -0.5 * n_h * log(2 * pi) -
-      ## penalty based on partition block sizes
-        -0.5 * log(1 + n_h * var0) -
-      ## effect of coairates
-        0.5 * (sum(x_h^2) + m0^2 / var0 -
-                 (s1_h + m0 / var0)^2 / (n_h + 1 / var0))
+      log_g_h[h] <- -0.5 * (
+        n_h * log(2 * pi) +                  # constant
+        log(1 + n_h * var0) +                # block-size penalty
+        sum(x_h^2) + m0^2 / var0 -           # covariate effect
+          (s1_h + m0 / var0)^2 / (n_h + 1 / var0)
+      )
     }
 
     return(log_g_h)
