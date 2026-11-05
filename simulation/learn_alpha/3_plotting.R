@@ -361,8 +361,9 @@ make_trace_df <- function(obj, scenario, result_name) {
       iter       = seq_len(N_iter),
       alpha      = av,
       alpha_rm   = cumsum(av) / seq_len(N_iter),
-      similarity = rv - b_alpha,
-      sim_rm     = cumsum(rv - b_alpha) / seq_len(N_iter),
+      ## rate = b - sum_h log g_h, so b - rate is the log similarity
+      similarity = b_alpha - rv,
+      sim_rm     = cumsum(b_alpha - rv) / seq_len(N_iter),
       covariate  = paste0("x", j),
       cov_type   = cov_type[j],
       scenario   = scenario,
@@ -406,7 +407,7 @@ plot_trace_pair <- function(obj, scenario, result_name, outDir) {
     geom_hline(data = mu_sim_df, aes(yintercept = similarity, color = cov_type),
                linetype = 2, linewidth = 0.5) +
     labs(title = paste0(scenario, ": similarity traces"),
-         x = "Iteration", y = "Similarity", color = "Covariate type") +
+         x = "Iteration", y = expression(sum[h] ~ log ~ g(X[h])), color = "Covariate type") +
     trace_theme
 
   ggsave(
